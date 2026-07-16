@@ -1,0 +1,4 @@
+interface:
+  display_name: '云效发版配置'
+  short_description: '初始化共享配置并验证成员身份、官方 MCP 认证和仓库信息'
+  default_prompt: '使用 $yunxiao-release-config 初始化或检查当前项目的云效发版配置。'

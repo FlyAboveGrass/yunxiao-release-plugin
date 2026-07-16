@@ -1,0 +1,23 @@
+{
+  "name": "yunxiao-release",
+  "version": "0.3.0",
+  "description": "通过阿里云云效官方 MCP 组织任意 Git 项目的单 MR 开发、评审与发版准备流程。",
+  "author": {
+    "name": "FlyAboveGrass"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "云效单 MR 发版",
+    "shortDescription": "通过官方 MCP 完成 MR 与发版准备。",
+    "longDescription": "验证项目、创建或恢复云效 MR、按需处理评审评论，并在同一个 MR 合并前更新版本号与发版公告。当前版本不提供 MR 合并能力。",
+    "developerName": "FlyAboveGrass",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "初始化或检查当前项目的云效发版配置。",
+      "验证当前分支并创建或恢复云效 MR。",
+      "在当前 MR 合并前更新版本号和发版公告。"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

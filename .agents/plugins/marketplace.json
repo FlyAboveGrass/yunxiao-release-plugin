@@ -1,0 +1,20 @@
+{
+  "name": "yunxiao-release-community",
+  "interface": {
+    "displayName": "Yunxiao Release Community"
+  },
+  "plugins": [
+    {
+      "name": "yunxiao-release",
+      "source": {
+        "source": "local",
+        "path": "./plugins/yunxiao-release"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
