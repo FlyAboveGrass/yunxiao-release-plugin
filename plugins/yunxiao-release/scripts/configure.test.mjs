@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 import { buildConfig, configureProject, writeProjectConfig } from './configure-project.mjs';
 import { hasConfiguredToken, resolveEnvPath, upsertToken, writeToken } from './configure-token.mjs';
@@ -19,17 +20,35 @@ const run = () => {
   assert.equal(config.versionFile, null);
   assert.equal(buildConfig({ targetBranch: 'main', versionFile: 'VERSION' }).targetBranch, 'main');
   assert.throws(() => writeProjectConfig(rootDir, config), /不是 Git 仓库/);
-  writeFileSync(resolve(rootDir, '.git'), 'gitdir: test\n');
+  execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+  writeFileSync(resolve(rootDir, '.gitignore'), '.codex/\n');
   assert.throws(() => writeProjectConfig(rootDir, { ...config, runtimeFile: '../outside.json' }), /项目内相对路径/);
   configureProject(rootDir);
   assert.equal(JSON.parse(readFileSync(resolve(rootDir, '.codex/yunxiao-release.json'))).targetBranch, 'master');
+  assert.equal(spawnSync('git', ['check-ignore', '.codex/yunxiao-release.json'], { cwd: rootDir }).status, 1);
   writeFileSync(
     resolve(rootDir, '.codex/yunxiao-release.json'),
-    `${JSON.stringify({ ...config, organizationId: 'org', repositoryId: 'repo', targetBranch: 'release' })}\n`,
+    `${JSON.stringify({
+      ...config,
+      organizationId: 'org',
+      repositoryId: 'repo',
+      targetBranch: 'release',
+      localConfigFile: '.private/member.json',
+      runtimeFile: '.runtime/mr.json',
+      commentsFile: '.runtime/comments.md',
+    })}\n`,
   );
   configureProject(rootDir);
   assert.equal(JSON.parse(readFileSync(resolve(rootDir, '.codex/yunxiao-release.json'))).targetBranch, 'release');
-  assert.match(readFileSync(resolve(rootDir, '.gitignore'), 'utf8'), /\.codex\/runtime\//);
+  ['.private/member.json', '.runtime/mr.json', '.runtime/comments.md'].forEach((file) => {
+    assert.equal(spawnSync('git', ['check-ignore', file], { cwd: rootDir }).status, 0);
+  });
+
+  const symlinkRoot = mkdtempSync(resolve(tmpdir(), 'yunxiao-release-symlink-'));
+  const outsideRoot = mkdtempSync(resolve(tmpdir(), 'yunxiao-release-outside-'));
+  execFileSync('git', ['init'], { cwd: symlinkRoot, stdio: 'ignore' });
+  symlinkSync(outsideRoot, resolve(symlinkRoot, '.codex'), 'dir');
+  assert.throws(() => configureProject(symlinkRoot), /现有父路径必须位于项目目录内/);
 
   const envPath = resolve(rootDir, 'codex-home/.env');
   mkdirSync(resolve(rootDir, 'codex-home'), { recursive: true });
@@ -42,6 +61,8 @@ const run = () => {
   assert.equal(hasConfiguredToken('YUNXIAO_ACCESS_TOKEN=\n'), false);
   assert.equal(hasConfiguredToken('YUNXIAO_ACCESS_TOKEN=token\n'), true);
   assert.throws(() => upsertToken('', 'bad\ntoken'), /包含换行符/);
+  rmSync(symlinkRoot, { recursive: true, force: true });
+  rmSync(outsideRoot, { recursive: true, force: true });
   rmSync(rootDir, { recursive: true, force: true });
   console.log('configure self-test passed');
 };

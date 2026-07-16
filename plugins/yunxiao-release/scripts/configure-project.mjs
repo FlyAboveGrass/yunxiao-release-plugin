@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const defaultConfig = {
@@ -20,24 +20,42 @@ const defaultConfig = {
 
 export const buildConfig = (existing = {}) => ({ ...defaultConfig, ...existing });
 
-const updateGitignore = (rootDir) => {
+const updateGitignore = (rootDir, config) => {
   const filePath = resolve(rootDir, '.gitignore');
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
-  const rules = ['.codex/yunxiao-release.local.json', '.codex/runtime/'];
+  const ignoredFiles = [config.localConfigFile, config.runtimeFile, config.commentsFile]
+    .map((file) => `/${file.replaceAll('\\', '/')}`);
+  const rules = ['!/.codex/', '/.codex/*', '!/.codex/yunxiao-release.json', ...ignoredFiles];
   const missing = rules.filter((rule) => !current.split(/\r?\n/).includes(rule));
   const prefix = current.trimEnd();
   if (missing.length) writeFileSync(filePath, `${prefix ? `${prefix}\n` : ''}${missing.join('\n')}\n`);
 };
 
+// 同时校验词法路径和已存在父路径的真实位置，阻止绝对路径、穿越和符号链接逃逸。
+const validateProjectPath = (rootDir, configuredPath, label) => {
+  if (typeof configuredPath !== 'string' || !configuredPath || /[\r\n\0]/.test(configuredPath)) {
+    throw new Error(`${label} 必须是非空项目内相对路径`);
+  }
+  const relativePath = relative(resolve(rootDir), resolve(rootDir, configuredPath));
+  if (isAbsolute(configuredPath) || !relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new Error(`${label} 必须是项目内相对路径`);
+  }
+  const existingAncestor = (() => {
+    const find = (filePath) => (existsSync(filePath) ? filePath : find(dirname(filePath)));
+    return find(resolve(rootDir, configuredPath));
+  })();
+  const realRelativePath = relative(realpathSync(rootDir), realpathSync(existingAncestor));
+  if (realRelativePath.startsWith('..') || isAbsolute(realRelativePath)) {
+    throw new Error(`${label} 的现有父路径必须位于项目目录内`);
+  }
+};
+
 const validateProjectPaths = (rootDir, config) => {
   ['localConfigFile', 'runtimeFile', 'commentsFile', 'versionFile', 'announcementFile']
     .filter((key) => config[key] !== null)
-    .forEach((key) => {
-      const relativePath = relative(resolve(rootDir), resolve(rootDir, config[key]));
-      if (isAbsolute(config[key]) || !relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
-        throw new Error(`${key} 必须是项目内相对路径`);
-      }
-    });
+    .forEach((key) => validateProjectPath(rootDir, config[key], key));
+  validateProjectPath(rootDir, '.codex/yunxiao-release.json', 'configFile');
+  validateProjectPath(rootDir, '.gitignore', 'gitignoreFile');
 };
 
 export const writeProjectConfig = (rootDir, config) => {
@@ -47,7 +65,7 @@ export const writeProjectConfig = (rootDir, config) => {
   const filePath = resolve(codexDir, 'yunxiao-release.json');
   mkdirSync(codexDir, { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(config, null, 2)}\n`);
-  updateGitignore(rootDir);
+  updateGitignore(rootDir, config);
   return filePath;
 };
 
