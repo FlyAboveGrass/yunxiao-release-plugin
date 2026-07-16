@@ -7,3 +7,5 @@
 ```bash
 curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main/install.sh | bash
 ```
+
+本项目采用 [MIT License](LICENSE)。

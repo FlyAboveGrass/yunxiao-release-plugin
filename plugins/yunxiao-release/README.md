@@ -201,8 +201,11 @@ codex plugin marketplace remove yunxiao-release-community
 
 - 一键安装脚本面向 macOS、Linux 和 WSL；原生 Windows PowerShell 尚无对应脚本。
 - 运行时依赖 Node.js 20+、Git、Codex Plugins 和阿里云云效官方 MCP。
-- 当前仓库尚未添加开源许可证；公开源码不等于授予再分发或修改许可。
 - 当前文档只提供中文版本。
+
+## 许可证
+
+本项目采用 [MIT License](../../LICENSE)。
 
 ## 开发验证
 
