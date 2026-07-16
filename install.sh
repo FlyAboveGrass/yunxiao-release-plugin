@@ -29,6 +29,7 @@ printf '\n' >/dev/tty
 [[ -n "$YUNXIAO_ACCESS_TOKEN" ]] || { echo 'Token 不能为空' >&2; exit 1; }
 printf '%s' "$YUNXIAO_ACCESS_TOKEN" | node "$TEMP_DIR/configure-token.mjs"
 unset YUNXIAO_ACCESS_TOKEN
+test -s "${CODEX_HOME:-$HOME/.codex}/.env" || { echo 'Token 配置失败' >&2; exit 1; }
 
 if codex plugin marketplace list | awk 'NR > 1 { print $1 }' | grep -qx "$MARKETPLACE"; then
   codex plugin marketplace upgrade "$MARKETPLACE"
@@ -39,5 +40,6 @@ codex plugin add "$PLUGIN@$MARKETPLACE"
 
 readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 (cd "$PROJECT_ROOT" && node "$TEMP_DIR/configure-project.mjs")
+test -f "$PROJECT_ROOT/.codex/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
 echo "安装完成。请编辑 $PROJECT_ROOT/.codex/yunxiao-release.json，然后重启 Codex 并新建会话。"
