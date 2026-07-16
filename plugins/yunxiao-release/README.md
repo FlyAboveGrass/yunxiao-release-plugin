@@ -179,6 +179,31 @@ codex plugin list
 
 云效仍有审批、流水线、分支保护或其他门禁。插件不会绕过门禁，也不提供合并能力。
 
+## 更新与卸载
+
+更新 marketplace 后重新安装最新插件：
+
+```bash
+codex plugin marketplace upgrade yunxiao-release-community
+codex plugin add yunxiao-release@yunxiao-release-community
+```
+
+卸载插件和 marketplace：
+
+```bash
+codex plugin remove yunxiao-release@yunxiao-release-community
+codex plugin marketplace remove yunxiao-release-community
+```
+
+操作后重启 Codex 并新建会话。卸载不会删除项目的 `.codex/yunxiao-release.json` 或 Codex Home 中的 Token。
+
+## 当前限制
+
+- 一键安装脚本面向 macOS、Linux 和 WSL；原生 Windows PowerShell 尚无对应脚本。
+- 运行时依赖 Node.js 20+、Git、Codex Plugins 和阿里云云效官方 MCP。
+- 当前仓库尚未添加开源许可证；公开源码不等于授予再分发或修改许可。
+- 当前文档只提供中文版本。
+
 ## 开发验证
 
 ```bash
