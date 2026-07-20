@@ -26,6 +26,34 @@ const run = () => {
   configureProject(rootDir);
   assert.equal(JSON.parse(readFileSync(resolve(rootDir, '.codex/yunxiao-release.json'))).targetBranch, 'master');
   assert.equal(spawnSync('git', ['check-ignore', '.codex/yunxiao-release.json'], { cwd: rootDir }).status, 1);
+  assert.equal(
+    readFileSync(resolve(rootDir, '.gitignore'), 'utf8'),
+    '.codex/\n!/.codex/\n/.codex/*\n!/.codex/yunxiao-release.json\n',
+  );
+
+  const simpleRoot = mkdtempSync(resolve(tmpdir(), 'yunxiao-release-simple-ignore-'));
+  execFileSync('git', ['init'], { cwd: simpleRoot, stdio: 'ignore' });
+  configureProject(simpleRoot);
+  assert.equal(
+    readFileSync(resolve(simpleRoot, '.gitignore'), 'utf8'),
+    '/.codex/yunxiao-release.local.json\n/.codex/runtime/\n',
+  );
+  assert.equal(spawnSync('git', ['check-ignore', '.codex/yunxiao-release.json'], { cwd: simpleRoot }).status, 1);
+  assert.equal(spawnSync('git', ['check-ignore', '.codex/yunxiao-release.local.json'], { cwd: simpleRoot }).status, 0);
+  assert.equal(spawnSync('git', ['check-ignore', '.codex/runtime/state.json'], { cwd: simpleRoot }).status, 0);
+  assert.equal(spawnSync('git', ['check-ignore', '.codex/other.json'], { cwd: simpleRoot }).status, 1);
+
+  const legacyRoot = mkdtempSync(resolve(tmpdir(), 'yunxiao-release-legacy-ignore-'));
+  execFileSync('git', ['init'], { cwd: legacyRoot, stdio: 'ignore' });
+  writeFileSync(
+    resolve(legacyRoot, '.gitignore'),
+    '.codex/\n!/.codex/\n/.codex/*\n!/.codex/yunxiao-release.json\n/.codex/yunxiao-release.local.json\n/.codex/runtime/yunxiao-release-mr.json\n/.codex/runtime/yunxiao-release-comments.md\n',
+  );
+  configureProject(legacyRoot);
+  assert.equal(
+    readFileSync(resolve(legacyRoot, '.gitignore'), 'utf8'),
+    '.codex/\n!/.codex/\n/.codex/*\n!/.codex/yunxiao-release.json\n',
+  );
   writeFileSync(
     resolve(rootDir, '.codex/yunxiao-release.json'),
     `${JSON.stringify({
@@ -63,6 +91,8 @@ const run = () => {
   assert.throws(() => upsertToken('', 'bad\ntoken'), /包含换行符/);
   rmSync(symlinkRoot, { recursive: true, force: true });
   rmSync(outsideRoot, { recursive: true, force: true });
+  rmSync(legacyRoot, { recursive: true, force: true });
+  rmSync(simpleRoot, { recursive: true, force: true });
   rmSync(rootDir, { recursive: true, force: true });
   console.log('configure self-test passed');
 };

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,15 +21,46 @@ const defaultConfig = {
 
 export const buildConfig = (existing = {}) => ({ ...defaultConfig, ...existing });
 
+const toIgnoreRule = (file) => `/${file.replaceAll('\\', '/')}`;
+
+const getPrivateRules = (config) => {
+  const runtimeRules =
+    config.runtimeFile === defaultConfig.runtimeFile && config.commentsFile === defaultConfig.commentsFile
+      ? ['/.codex/runtime/']
+      : [toIgnoreRule(config.runtimeFile), toIgnoreRule(config.commentsFile)];
+  return [toIgnoreRule(config.localConfigFile), ...runtimeRules];
+};
+
+const isIgnored = (rootDir, file) => {
+  const result = spawnSync('git', ['check-ignore', '--no-index', '--quiet', '--', file], { cwd: rootDir });
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  throw new Error(`无法检查 Git 忽略规则: ${result.stderr?.toString().trim() || 'git check-ignore 执行失败'}`);
+};
+
+// 普通项目只忽略两个本地目标；已有 .codex 整体规则时才补共享配置的最小放行规则。
 const updateGitignore = (rootDir, config) => {
   const filePath = resolve(rootDir, '.gitignore');
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
-  const ignoredFiles = [config.localConfigFile, config.runtimeFile, config.commentsFile]
-    .map((file) => `/${file.replaceAll('\\', '/')}`);
-  const rules = ['!/.codex/', '/.codex/*', '!/.codex/yunxiao-release.json', ...ignoredFiles];
-  const missing = rules.filter((rule) => !current.split(/\r?\n/).includes(rule));
-  const prefix = current.trimEnd();
-  if (missing.length) writeFileSync(filePath, `${prefix ? `${prefix}\n` : ''}${missing.join('\n')}\n`);
+  const currentLines = current.split(/\r?\n/);
+  const privateRules = getPrivateRules(config);
+  const hasCodexWildcard = currentLines.includes('/.codex/*');
+  const rules = hasCodexWildcard || isIgnored(rootDir, '.codex/yunxiao-release.json')
+    ? ['!/.codex/', '/.codex/*', '!/.codex/yunxiao-release.json', ...privateRules.filter((rule) => !rule.startsWith('/.codex/'))]
+    : privateRules;
+  const generatedPrivateRules = new Set([
+    ...getPrivateRules(defaultConfig),
+    ...[config.localConfigFile, config.runtimeFile, config.commentsFile].map(toIgnoreRule),
+  ]);
+  const retainedLines = hasCodexWildcard
+    ? currentLines.filter((rule) => !generatedPrivateRules.has(rule) || !rule.startsWith('/.codex/'))
+    : currentLines;
+  const missing = rules.filter((rule) => !retainedLines.includes(rule));
+  const removedLegacyRules = retainedLines.length !== currentLines.length;
+  if (!missing.length && !removedLegacyRules) return;
+  const prefix = retainedLines.join('\n').trimEnd();
+  const next = `${prefix ? `${prefix}\n` : ''}${missing.join('\n')}${missing.length ? '\n' : ''}`;
+  writeFileSync(filePath, next);
 };
 
 // 同时校验词法路径和已存在父路径的真实位置，阻止绝对路径、穿越和符号链接逃逸。

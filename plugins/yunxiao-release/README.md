@@ -40,6 +40,15 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
 
 脚本不会打印 Token，也不会将 Token 放入命令参数或 shell 历史。完成后编辑生成的配置文件，再重启 Codex 并新建会话。
 
+普通项目默认只向 `.gitignore` 追加两条规则：
+
+```gitignore
+/.codex/yunxiao-release.local.json
+/.codex/runtime/
+```
+
+若项目原本已整体忽略 `.codex/`，脚本才会写入最小的重新包含规则，确保 `.codex/yunxiao-release.json` 可以提交。再次运行配置脚本会自动删除旧版本写入且已被 `/.codex/*` 覆盖的冗余规则。
+
 ## 配置项目
 
 安装会生成以下共享配置；无需修改安装脚本，也无需向 `configure-project` 传命令行参数：
