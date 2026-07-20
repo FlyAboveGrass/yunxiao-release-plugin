@@ -211,6 +211,7 @@ codex plugin marketplace remove yunxiao-release-community
 
 ```bash
 python3 /path/to/plugin-creator/scripts/validate_plugin.py plugins/yunxiao-release
+bash install.test.sh
 node plugins/yunxiao-release/scripts/configure.test.mjs
 node plugins/yunxiao-release/scripts/cli-entry.test.mjs
 node plugins/yunxiao-release/scripts/release-state.test.mjs
