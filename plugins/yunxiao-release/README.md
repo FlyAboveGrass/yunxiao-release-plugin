@@ -85,13 +85,50 @@ rm /tmp/yunxiao-configure-project.mjs
 
 ## 初始化成员身份
 
-重启 Codex 并新建会话后执行：
+`.codex/yunxiao-release.local.json` 保存当前成员在本项目中的本地身份映射。它用于把成员显示名称、云效 MCP 当前用户 ID 和 Token 来源关联起来，不保存 Token，也不提交到 Git。每位成员、每个独立工作区都需要单独初始化。
+
+推荐由配置 Skill 自动生成。安装完成并重启 Codex、新建会话后执行：
 
 ```text
 $yunxiao-release:yunxiao-release-config 检查当前项目的云效配置，我的显示名称是“YOUR_NAME”。
 ```
 
-Skill 会通过官方 MCP 验证 Token、用户、组织、代码库和目标分支，并将非敏感用户 ID 写入本地成员配置。
+Skill 会执行以下操作：
+
+1. 读取 `.codex/yunxiao-release.json` 中的组织、代码库和目标分支。
+2. 通过云效官方 MCP 查询当前 Token 对应的用户，验证组织和代码库可见性。
+3. 将 MCP 返回的非敏感 `userId`、输入的显示名称和固定的 Token 来源写入本地配置。
+4. 验证该文件和 `.codex/runtime/` 已被 Git 忽略。
+
+生成结果如下：
+
+```json
+{
+  "displayName": "张三",
+  "userId": "云效 MCP 返回的当前用户 ID",
+  "tokenSource": "environment"
+}
+```
+
+字段说明：
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `displayName` | 是 | 当前成员的本地显示名称，由成员输入；不参与认证。 |
+| `userId` | 是 | 云效官方 MCP 返回的当前用户 ID，必须与当前 Token 身份一致；禁止猜测或填写组织 ID、邮箱、用户名。 |
+| `tokenSource` | 是 | 当前只支持固定值 `environment`，表示 Token 从 Codex 进程环境中的 `YUNXIAO_ACCESS_TOKEN` 读取。 |
+
+只有已经通过云效官方 MCP 确认 `userId` 时，才可手工创建该文件：
+
+```bash
+mkdir -p .codex
+${EDITOR:-vi} .codex/yunxiao-release.local.json
+git check-ignore -v .codex/yunxiao-release.local.json
+```
+
+若 `git check-ignore` 没有输出，重新运行安装脚本或 `configure-project.mjs` 补齐 `.gitignore` 规则。不要把 `YUNXIAO_ACCESS_TOKEN`、Authorization 头或其他认证信息写入此文件。Token 应保存在 `${CODEX_HOME:-$HOME/.codex}/.env`。
+
+该路径由共享配置的 `localConfigFile` 控制；修改路径后仍使用相同字段，并需重新运行 `configure-project.mjs` 生成对应的忽略规则。切换 Token 或云效账号后，重新执行配置 Skill，更新 `userId` 并再次验证身份。
 
 ## 更新过期 Token
 

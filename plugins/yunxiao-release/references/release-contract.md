@@ -9,7 +9,23 @@
 | MR 运行状态 | `.codex/runtime/yunxiao-release-mr.json` | 忽略 |
 | 评论处理文档 | `.codex/runtime/yunxiao-release-comments.md` | 忽略 |
 
-成员配置只保存 `displayName`、MCP 返回的 `userId` 和 `tokenSource`。禁止保存 Token、认证头或可还原 Token 的信息。
+成员配置使用以下 Schema：
+
+```json
+{
+  "displayName": "成员输入的本地显示名称",
+  "userId": "云效官方 MCP 返回的当前用户 ID",
+  "tokenSource": "environment"
+}
+```
+
+- `displayName`、`userId`、`tokenSource` 均为必填字段。
+- `userId` 必须来自当前 Token 对应的 MCP 用户，不得从名称、邮箱、组织或仓库信息猜测。
+- `tokenSource` 当前只允许 `environment`；Token 本体保存在 Codex Home 的 `.env`，不得写入成员配置。
+- 成员配置按成员和工作区分别生成，由 `localConfigFile` 指定项目内相对路径，并必须被 Git 忽略。
+- 切换 Token 或云效账号后必须重新验证身份并更新成员配置。
+
+成员配置禁止保存 Token、Authorization 头或任何可还原 Token 的信息。
 
 共享配置至少包含 `organizationId` 和 `repositoryId`。`remoteName` 默认 `origin`，`targetBranch` 默认 `master`，`reviewMode` 默认 `ask`；版本文件和公告文件为可选能力，不得假设项目使用 `package.json` 或固定文档路径。
 
