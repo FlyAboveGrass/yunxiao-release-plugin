@@ -27,7 +27,31 @@
 
 成员配置禁止保存 Token、Authorization 头或任何可还原 Token 的信息。
 
-共享配置至少包含 `organizationId` 和 `repositoryId`。`remoteName` 默认 `origin`，`targetBranch` 默认 `master`，`reviewMode` 默认 `ask`；版本文件和公告文件为可选能力，不得假设项目使用 `package.json` 或固定文档路径。
+共享配置字段必须按下表解释；缺失的可选字段按默认值补齐，必填字段不得猜测：
+
+| 字段 | 默认值 | 获取来源或规则 |
+|---|---|---|
+| `organizationId` | 无，必填；配置流程无法获取或未确认时停止 | `get_current_organization_info` 返回的当前组织，或用户从云效管理后台基本信息提供；必须确认 |
+| `repositoryId` | 无，必填；配置流程无法唯一确认时停止 | 从 Git remote 提取仓库名，用 `list_repositories` 搜索候选；用户确认后以 `get_repository` 返回的数字 `id` 核对，并将 `String(id)` 作为十进制字符串写入 |
+| `remoteName` | `origin` | 当前项目 `git remote -v` 中指向目标云效仓库的 remote |
+| `targetBranch` | `master` | 项目分支策略和项目维护者决定；使用 `get_branch` 验证存在，不从仓库响应推断默认分支 |
+| `reviewMode` | `ask` | 项目 Review 流程策略，只允许 `ask|required|skip` |
+| `reviewerMode` | `ask` | MR 评审人选择策略，只允许 `ask|fixed` |
+| `reviewerUserIds` | `[]` | `search_organization_members` 返回并由用户确认的 `userId` 白名单；代码库权限另行确认 |
+| `versionFile` | `null` | 项目现有版本来源；`null` 跳过版本修改 |
+| `announcementFile` | `null` | 项目现有发版公告；`null` 跳过公告修改 |
+| `localConfigFile` | `.codex/yunxiao-release.local.json` | 项目内成员配置路径，必须被 Git 忽略 |
+| `runtimeFile` | `.codex/runtime/yunxiao-release-mr.json` | 项目内 MR 状态路径，必须被 Git 忽略 |
+| `commentsFile` | `.codex/runtime/yunxiao-release-comments.md` | 项目内评论记录路径，必须被 Git 忽略 |
+| `validationCommands` | `["git diff --check"]` | 项目规则和 CI 的最低验证命令，必须是非空数组；执行前逐条展示并确认 |
+
+`reviewMode` 的行为：
+
+- `ask`：创建或恢复 MR 后询问是否进入评论同步和修复流程；进入收尾时重新确认，允许选择跳过。
+- `required`：收尾前必须完整同步评论，并处理或确认没有阻塞性的未解决评论。
+- `skip`：不主动同步或处理评论，直接提示进入收尾。
+
+`reviewMode` 不修改云效审批规则，也不能证明 MR 已审批通过。版本文件和公告文件为可选能力，不得假设项目使用 `package.json` 或固定文档路径。
 
 评审人配置使用以下字段：
 
@@ -45,7 +69,7 @@
 - 每个 ID 使用前必须通过 MCP 核对用户 ID、组织归属和启用状态。组织成员身份不能证明代码库权限，白名单的代码库权限由项目维护者确认。
 - “全部”只表示白名单全部成员；不得将全部组织成员作为评审人。
 
-`reviewMode` 控制后续 Review 工作流是否询问、强制或跳过；`reviewerMode` 控制创建 MR 时如何选择人员，两者含义不同。
+`reviewMode` 控制后续 Review 工作流是否询问、强制或跳过；`reviewerMode` 控制创建 MR 时如何选择人员，两者互不替代。
 
 ## MR 状态
 

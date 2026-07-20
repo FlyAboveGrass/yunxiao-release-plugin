@@ -71,19 +71,40 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
 }
 ```
 
-只需编辑 `.codex/yunxiao-release.json`：
+只需编辑 `.codex/yunxiao-release.json`。每个字段的含义、默认行为和来源如下：
 
-- `organizationId`：必填，云效组织 ID。
-- `repositoryId`：必填，云效代码库 ID。
-- `remoteName`：可选，默认 `origin`。
-- `targetBranch`：可选，默认 `master`；使用 `main`、`develop`、`release` 等分支时显式修改。
-- `reviewMode`：`ask`、`required` 或 `skip`，控制创建 MR 后的 Review 工作流。
-- `reviewerMode`：`ask` 或 `fixed`，控制创建 MR 时如何选择评审人。
-- `reviewerUserIds`：当前项目确认过的评审人用户 ID 白名单。
-- `versionFile`、`announcementFile`：不需要对应能力时保持 `null`。
-- `validationCommands`：执行前插件会展示完整命令并要求确认。
+| 字段 | 含义 | 不配置时的默认行为 | 从哪里获取或如何决定 |
+|---|---|---|---|
+| `organizationId` | 云效组织 ID | 无可用默认值；配置 Skill 会查询当前组织并要求确认，无法获取或未确认时停止 | 推荐由配置 Skill 调用 `get_current_organization_info` 读取并让你确认；也可在云效“管理后台 > 基本信息”查看 |
+| `repositoryId` | 云效代码库数字 ID 的十进制字符串，如 `"2813489"` | 无可用默认值；配置 Skill 会查询候选仓库并要求确认，无法唯一确认时停止 | 推荐由配置 Skill 从当前 Git remote 提取仓库名，用 `list_repositories` 搜索候选并让你确认，再用 `get_repository` 核对返回的数字 `id`，以 `String(id)` 写入 |
+| `remoteName` | 推送和同步使用的 Git remote 名称 | `origin` | 在项目中运行 `git remote -v`，选择指向目标云效代码库的 remote |
+| `targetBranch` | MR 的目标分支 | `master` | 由项目分支策略和项目维护者确定；配置 Skill 只用 `get_branch` 验证该分支真实存在，不自行推断默认分支 |
+| `reviewMode` | 创建或恢复 MR 后，插件是否进入评论同步和修复流程 | `ask` | 项目团队决定，值及行为见下文 |
+| `reviewerMode` | 创建 MR 时如何从评审人白名单选择人员 | `ask` | 项目团队决定，值及行为见下文 |
+| `reviewerUserIds` | 当前项目确认过的评审人用户 ID 白名单 | `[]`；`ask` 模式不指定评审人，`fixed` 模式报配置错误 | 配置 Skill 用 `search_organization_members` 搜索成员，用户确认后取返回的 `userId`；代码库权限由项目维护者另行确认 |
+| `versionFile` | 收尾时需要更新的项目内版本文件 | `null`，跳过版本修改 | 从项目现有版本来源选择，如 `package.json`、`VERSION`；项目没有统一版本文件时保持 `null` |
+| `announcementFile` | 收尾时需要更新的项目内发版公告 | `null`，跳过公告修改 | 使用项目现有且团队确认的公告文件；项目没有公告文件时保持 `null` |
+| `localConfigFile` | 当前成员本地身份配置路径 | `.codex/yunxiao-release.local.json` | 插件内部路径，通常无需修改；必须是项目内相对路径并被 Git 忽略 |
+| `runtimeFile` | 当前分支与 MR 运行状态路径 | `.codex/runtime/yunxiao-release-mr.json` | 插件内部路径，通常无需修改；必须是项目内相对路径并被 Git 忽略 |
+| `commentsFile` | MR 评论同步和处理记录路径 | `.codex/runtime/yunxiao-release-comments.md` | 插件内部路径，通常无需修改；必须是项目内相对路径并被 Git 忽略 |
+| `validationCommands` | 创建 MR 和收尾前执行的最低验证命令列表 | `["git diff --check"]`；空数组无效 | 从项目 `AGENTS.md`、CI 配置和现有包脚本中选择，由团队维护；每条命令执行前都会展示并要求确认 |
 
-不要从 remote URL 猜组织或代码库 ID。请从云效页面获取，或安装后让配置 Skill 通过官方 MCP 查询并由你确认。
+不要从 remote URL 的文本格式猜组织或代码库 ID。配置 Skill 只从 remote 提取搜索词，最终写入值必须来自官方 MCP 返回结果并经过用户确认。云效官方文档也说明，组织 ID 可从管理后台基本信息获取，代码库查询结果包含代码库 `id`：[查询成员信息](https://help.aliyun.com/zh/yunxiao/developer-reference/getmember-query-member-information)、[查询代码库](https://help.aliyun.com/zh/yunxiao/developer-reference/getrepository-query-the-code-base)。
+
+### `reviewMode`：Review 工作流模式
+
+- `ask`（默认）：创建或恢复 MR 后询问是否进入评论同步和修复流程；进入收尾时再次确认，选择跳过即可继续。
+- `required`：收尾前必须同步当前 MR 的完整评论，并处理或确认没有阻塞性的未解决评论。
+- `skip`：不主动同步或处理评论，创建或恢复 MR 后直接提示进入收尾。
+
+`reviewMode` 只控制插件的后续 Review 工作流，不会修改云效审批规则，也不代表 MR 已通过审批。
+
+### `reviewerMode`：MR 评审人选择模式
+
+- `ask`（默认）：创建 MR 前，从 `reviewerUserIds` 白名单中交互选择一个、多个、全部或不指定；白名单为空时不指定评审人。
+- `fixed`：创建 MR 时自动使用 `reviewerUserIds` 中的全部成员；白名单为空时停止并报告配置错误。
+
+`reviewerMode` 决定把谁作为评审人传给云效，与 `reviewMode` 是否处理 MR 评论是两个独立配置。
 
 若安装时不在目标项目，之后可在任意 Git 项目根目录运行无参数配置脚本：
 

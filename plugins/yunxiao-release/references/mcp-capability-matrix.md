@@ -5,9 +5,9 @@
 | 能力 | 当前工具 | 使用规则 |
 |---|---|---|
 | 当前用户 | `get_current_user` | 配置检查必调 |
-| 当前组织 | `get_current_organization_info` | 配置检查必调 |
+| 当前组织 | `get_current_organization_info`、`get_user_organizations` | 获取当前组织 ID；切换组织时列出候选并由用户确认 |
 | 组织成员 | `get_organization_member_info_by_user_id`、`search_organization_members` | 校验评审人 ID、组织和成员状态；不能证明代码库权限 |
-| 仓库/分支 | `get_repository`、`get_branch` | 校验项目与分支 |
+| 仓库/分支 | `list_repositories`、`get_repository`、`get_branch` | 从 Git remote 提取搜索词，展示仓库候选并由用户确认；校验仓库与分支 |
 | MR 查询 | `get_change_request`、`list_change_requests` | 恢复和复核 MR |
 | MR 创建 | `create_change_request` | 明确确认后调用；使用 `reviewerUserIds` 传评审人用户 ID 数组 |
 | MR 版本 | `list_change_request_patch_sets` | 评论同步前调用 |
