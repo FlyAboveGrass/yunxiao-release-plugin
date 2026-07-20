@@ -29,6 +29,24 @@
 
 共享配置至少包含 `organizationId` 和 `repositoryId`。`remoteName` 默认 `origin`，`targetBranch` 默认 `master`，`reviewMode` 默认 `ask`；版本文件和公告文件为可选能力，不得假设项目使用 `package.json` 或固定文档路径。
 
+评审人配置使用以下字段：
+
+```json
+{
+  "reviewerMode": "ask",
+  "reviewerUserIds": []
+}
+```
+
+- `reviewerMode` 只允许 `ask` 或 `fixed`；缺失时兼容为 `ask`。
+- `reviewerUserIds` 是项目确认过的评审人用户 ID 白名单；缺失时兼容为空数组，元素必须是非空且不重复的字符串。
+- `ask` 在创建新 MR 前从白名单中交互选择一个、多个、全部或不指定；最终集合必须是已验证白名单的子集，白名单外 ID 必须转配置流程验证；空白名单时不指定评审人。
+- `fixed` 自动使用白名单中的全部 ID，空白名单属于配置错误。
+- 每个 ID 使用前必须通过 MCP 核对用户 ID、组织归属和启用状态。组织成员身份不能证明代码库权限，白名单的代码库权限由项目维护者确认。
+- “全部”只表示白名单全部成员；不得将全部组织成员作为评审人。
+
+`reviewMode` 控制后续 Review 工作流是否询问、强制或跳过；`reviewerMode` 控制创建 MR 时如何选择人员，两者含义不同。
+
 ## MR 状态
 
 状态文件以 `organizationId + repositoryId + sourceBranch` 定位记录；每个分支保存 `mergeRequests` 数组。记录至少包含：

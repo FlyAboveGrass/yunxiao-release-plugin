@@ -11,6 +11,8 @@ const defaultConfig = {
   remoteName: 'origin',
   targetBranch: 'master',
   reviewMode: 'ask',
+  reviewerMode: 'ask',
+  reviewerUserIds: [],
   versionFile: null,
   announcementFile: null,
   localConfigFile: '.codex/yunxiao-release.local.json',

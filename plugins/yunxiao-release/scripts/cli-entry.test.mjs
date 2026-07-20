@@ -24,7 +24,10 @@ const run = () => {
   });
   assert.equal(projectResult.status, 0, projectResult.stderr);
   assert.match(projectResult.stdout, /项目配置已写入/);
-  assert.equal(JSON.parse(readFileSync(resolve(projectDir, '.codex/yunxiao-release.json'))).targetBranch, 'master');
+  const projectConfig = JSON.parse(readFileSync(resolve(projectDir, '.codex/yunxiao-release.json')));
+  assert.equal(projectConfig.targetBranch, 'master');
+  assert.equal(projectConfig.reviewerMode, 'ask');
+  assert.deepEqual(projectConfig.reviewerUserIds, []);
 
   const tokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs')], {
     input: 'test-token',

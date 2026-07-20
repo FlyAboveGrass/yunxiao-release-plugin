@@ -60,6 +60,8 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
   "remoteName": "origin",
   "targetBranch": "master",
   "reviewMode": "ask",
+  "reviewerMode": "ask",
+  "reviewerUserIds": [],
   "versionFile": null,
   "announcementFile": null,
   "localConfigFile": ".codex/yunxiao-release.local.json",
@@ -75,7 +77,9 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
 - `repositoryId`：必填，云效代码库 ID。
 - `remoteName`：可选，默认 `origin`。
 - `targetBranch`：可选，默认 `master`；使用 `main`、`develop`、`release` 等分支时显式修改。
-- `reviewMode`：`ask`、`required` 或 `skip`。
+- `reviewMode`：`ask`、`required` 或 `skip`，控制创建 MR 后的 Review 工作流。
+- `reviewerMode`：`ask` 或 `fixed`，控制创建 MR 时如何选择评审人。
+- `reviewerUserIds`：当前项目确认过的评审人用户 ID 白名单。
 - `versionFile`、`announcementFile`：不需要对应能力时保持 `null`。
 - `validationCommands`：执行前插件会展示完整命令并要求确认。
 
@@ -91,6 +95,36 @@ rm /tmp/yunxiao-configure-project.mjs
 ```
 
 脚本会保留已有配置值，只补齐缺少的默认字段。
+
+## 配置 MR 评审人
+
+交互选择模式：
+
+```json
+{
+  "reviewerMode": "ask",
+  "reviewerUserIds": ["user-id-1", "user-id-2"]
+}
+```
+
+创建新 MR 前，插件会验证白名单成员并展示名称和用户 ID，可选择一个、多个、`全部` 或 `不指定`。最终选择只能来自已验证白名单；临时输入新 ID 时必须先转配置 Skill 验证。`全部`只表示配置中的全部候选，不会选中整个组织的成员。白名单为空时保持兼容，创建 MR 时不指定评审人。
+
+固定模式：
+
+```json
+{
+  "reviewerMode": "fixed",
+  "reviewerUserIds": ["user-id-1", "user-id-2"]
+}
+```
+
+固定模式会把配置中的全部 ID 传给云效 `create_change_request`；此时白名单不能为空。每个 ID 使用前都会通过官方 MCP 校验用户 ID、组织归属和成员状态。
+
+当前云效官方 MCP 只能查询组织成员，不能列出代码库成员及其权限。因此，插件不会把全部组织成员当成评审人；项目维护者需要确认白名单成员拥有当前代码库权限。可让配置 Skill 按成员名称搜索、展示匹配结果，并在你确认后写入共享配置：
+
+```text
+$yunxiao-release:yunxiao-release-config 将当前项目的 MR 评审人设置为“张三”和“李四”，创建 MR 时交互选择。
+```
 
 ## 初始化成员身份
 

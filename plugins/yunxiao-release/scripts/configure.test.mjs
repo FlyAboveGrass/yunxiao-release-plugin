@@ -17,6 +17,8 @@ const run = () => {
   assert.equal(config.repositoryId, '');
   assert.equal(config.targetBranch, 'master');
   assert.equal(config.remoteName, 'origin');
+  assert.equal(config.reviewerMode, 'ask');
+  assert.deepEqual(config.reviewerUserIds, []);
   assert.equal(config.versionFile, null);
   assert.equal(buildConfig({ targetBranch: 'main', versionFile: 'VERSION' }).targetBranch, 'main');
   assert.throws(() => writeProjectConfig(rootDir, config), /不是 Git 仓库/);
