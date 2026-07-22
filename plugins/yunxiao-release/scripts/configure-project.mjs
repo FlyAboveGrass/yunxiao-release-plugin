@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const legacyPrivatePaths = {
+  localConfigFile: '.codex/yunxiao-release.local.json',
+  runtimeFile: '.codex/runtime/yunxiao-release-mr.json',
+  commentsFile: '.codex/runtime/yunxiao-release-comments.md',
+};
 
 const defaultConfig = {
   organizationId: '',
@@ -15,9 +21,9 @@ const defaultConfig = {
   reviewerUserIds: [],
   versionFile: 'package.json',
   announcementFile: null,
-  localConfigFile: '.codex/yunxiao-release.local.json',
-  runtimeFile: '.codex/runtime/yunxiao-release-mr.json',
-  commentsFile: '.codex/runtime/yunxiao-release-comments.md',
+  localConfigFile: '.agents/yunxiao-release.local.json',
+  runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
+  commentsFile: '.agents/runtime/yunxiao-release-comments.md',
   validationCommands: ['git diff --check'],
 };
 
@@ -28,7 +34,7 @@ const toIgnoreRule = (file) => `/${file.replaceAll('\\', '/')}`;
 const getPrivateRules = (config) => {
   const runtimeRules =
     config.runtimeFile === defaultConfig.runtimeFile && config.commentsFile === defaultConfig.commentsFile
-      ? ['/.codex/runtime/']
+      ? ['/.agents/runtime/']
       : [toIgnoreRule(config.runtimeFile), toIgnoreRule(config.commentsFile)];
   return [toIgnoreRule(config.localConfigFile), ...runtimeRules];
 };
@@ -92,22 +98,66 @@ const validateProjectPaths = (rootDir, config) => {
   validateProjectPath(rootDir, '.gitignore', 'gitignoreFile');
 };
 
+// 先确保私有路径被忽略，再原子替换共享配置，失败时保留旧配置。
 export const writeProjectConfig = (rootDir, config) => {
   if (!existsSync(resolve(rootDir, '.git'))) throw new Error(`当前目录不是 Git 仓库：${rootDir}`);
   validateProjectPaths(rootDir, config);
   const codexDir = resolve(rootDir, '.codex');
   const filePath = resolve(codexDir, 'yunxiao-release.json');
   mkdirSync(codexDir, { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(config, null, 2)}\n`);
   updateGitignore(rootDir, config);
+  const temporaryPath = `${filePath}.tmp`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(config, null, 2)}\n`);
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    rmSync(temporaryPath, { force: true });
+    throw error;
+  }
   return filePath;
+};
+
+// 迁移前统一检查冲突，禁止在两份本地状态之间猜测应采用哪一份。
+const getLegacyMigrations = (rootDir, existing, config) => {
+  validateProjectPaths(rootDir, config);
+  return Object.entries(legacyPrivatePaths).flatMap(([key, legacyPath]) => {
+    if (existing[key] !== legacyPath) return [];
+    const sourcePath = resolve(rootDir, legacyPath);
+    const targetPath = resolve(rootDir, config[key]);
+    if (!existsSync(sourcePath)) return [];
+    if (existsSync(targetPath)) throw new Error(`${key} 的新旧默认文件同时存在，请确认保留哪一份后重试`);
+    return [{ sourcePath, targetPath }];
+  });
 };
 
 // 无参数生成可直接编辑的共享配置；已有配置只补默认字段，避免覆盖用户值。
 export const configureProject = (rootDir) => {
   const configPath = resolve(rootDir, '.codex/yunxiao-release.json');
   const existing = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : {};
-  return writeProjectConfig(rootDir, buildConfig(existing));
+  const migrated = { ...existing };
+  for (const [key, legacyPath] of Object.entries(legacyPrivatePaths)) {
+    if (migrated[key] === legacyPath) migrated[key] = defaultConfig[key];
+  }
+  const config = buildConfig(migrated);
+  const migrations = getLegacyMigrations(rootDir, existing, config);
+  if (migrations.length === 0) return writeProjectConfig(rootDir, config);
+
+  updateGitignore(rootDir, config);
+  for (const { targetPath } of migrations) {
+    if (!isIgnored(rootDir, relative(rootDir, targetPath))) throw new Error(`迁移目标未被 Git 忽略: ${targetPath}`);
+  }
+  const moved = [];
+  try {
+    for (const migration of migrations) {
+      mkdirSync(dirname(migration.targetPath), { recursive: true });
+      renameSync(migration.sourcePath, migration.targetPath);
+      moved.push(migration);
+    }
+    return writeProjectConfig(rootDir, config);
+  } catch (error) {
+    for (const migration of moved.reverse()) renameSync(migration.targetPath, migration.sourcePath);
+    throw error;
+  }
 };
 
 const main = () => {

@@ -13,9 +13,9 @@ const configDefaults = {
   reviewMode: 'ask',
   versionFile: 'package.json',
   announcementFile: null,
-  localConfigFile: '.codex/yunxiao-release.local.json',
-  runtimeFile: '.codex/runtime/yunxiao-release-mr.json',
-  commentsFile: '.codex/runtime/yunxiao-release-comments.md',
+  localConfigFile: '.agents/yunxiao-release.local.json',
+  runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
+  commentsFile: '.agents/runtime/yunxiao-release-comments.md',
   validationCommands: ['git diff --check'],
 };
 const requiredRecordKeys = [

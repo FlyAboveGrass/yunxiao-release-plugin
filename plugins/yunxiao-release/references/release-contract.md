@@ -5,10 +5,10 @@
 | 类型 | 路径 | Git |
 |---|---|---|
 | 项目共享配置 | `.codex/yunxiao-release.json` | 提交 |
-| 项目成员配置 | `.codex/yunxiao-release.local.json` | 忽略 |
+| 项目成员配置 | `.agents/yunxiao-release.local.json` | 忽略；Codex 与 Claude Code 共用 |
 | 用户级成员配置 | `${CODEX_HOME:-$HOME/.codex}/.env` | 不在项目中；默认路径可由 Codex 与 Claude Code 共用 |
-| MR 运行状态 | `.codex/runtime/yunxiao-release-mr.json` | 忽略 |
-| 评论处理文档 | `.codex/runtime/yunxiao-release-comments.md` | 忽略 |
+| MR 运行状态 | `.agents/runtime/yunxiao-release-mr.json` | 忽略；Codex 与 Claude Code 共用 |
+| 评论处理文档 | `.agents/runtime/yunxiao-release-comments.md` | 忽略；Codex 与 Claude Code 共用 |
 
 成员配置使用以下 Schema：
 
@@ -40,9 +40,9 @@
 | `reviewerUserIds` | `[]` | `search_organization_members` 返回并由用户确认的 `userId` 白名单；代码库权限另行确认 |
 | `versionFile` | `package.json` | 项目现有版本来源；显式设为 `null` 时跳过版本修改 |
 | `announcementFile` | `null` | 项目现有发版公告；`null` 跳过公告修改 |
-| `localConfigFile` | `.codex/yunxiao-release.local.json` | 可覆盖用户级配置的项目成员配置路径，必须被 Git 忽略 |
-| `runtimeFile` | `.codex/runtime/yunxiao-release-mr.json` | 项目内 MR 状态路径，必须被 Git 忽略 |
-| `commentsFile` | `.codex/runtime/yunxiao-release-comments.md` | 项目内评论记录路径，必须被 Git 忽略 |
+| `localConfigFile` | `.agents/yunxiao-release.local.json` | 可覆盖用户级配置的项目成员配置路径，必须被 Git 忽略 |
+| `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 项目内共享 MR 状态路径，必须被 Git 忽略 |
+| `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | 项目内共享评论记录路径，必须被 Git 忽略 |
 | `validationCommands` | `["git diff --check"]` | 项目规则和 CI 的最低验证命令，必须是非空数组；执行前逐条展示并确认 |
 
 `reviewMode` 的行为：

@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yunxiao-release",
   "displayName": "云效单 MR 发版",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "通过阿里云云效官方 MCP 组织任意 Git 项目的单 MR 开发、评审与发版准备流程。",
   "author": {
     "name": "FlyAboveGrass"

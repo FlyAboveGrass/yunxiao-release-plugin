@@ -8,6 +8,17 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
+if [[ "$(select_installer codex)" != 'install-codex.sh' || "$(select_installer claude)" != 'install-claude.sh' ]]; then
+  echo '统一安装入口没有映射到正确宿主' >&2
+  exit 1
+fi
+if select_installer unknown >/dev/null; then
+  echo '统一安装入口必须拒绝未知宿主' >&2
+  exit 1
+fi
+
+source "$ROOT_DIR/install-codex.sh"
+
 MOCK_MODE='stale'
 
 # 模拟 Codex CLI 的四类状态，并记录调用顺序以验证清理边界。
@@ -142,11 +153,11 @@ if [[ "$(<"$CODEX_HOME/.env")" != 'YUNXIAO_ACCESS_TOKEN=first-secret-token' ]]; 
   echo '首次输入的 Token 没有正确写入 Codex Home' >&2
   exit 1
 fi
-if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install.sh"; then
+if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install-codex.sh"; then
   echo 'Token 必须使用隐藏输入模式读取' >&2
   exit 1
 fi
-if ! grep -Fq 'configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty' "$ROOT_DIR/install.sh"; then
+if ! grep -Fq 'configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
   echo 'curl 管道安装时 Token 必须从控制终端读取' >&2
   exit 1
 fi
@@ -160,12 +171,12 @@ if [[ "$actual_calls" != "$expected_calls" ]]; then
   printf '交互配置启动参数不符合预期：\n%s\n' "$actual_calls" >&2
   exit 1
 fi
-if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT" </dev/tty' "$ROOT_DIR/install.sh"; then
+if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
   echo '新 Codex 交互配置必须继承控制终端' >&2
   exit 1
 fi
 
-piped_output="$(sed 's/^  main "$@"$/  printf "piped main invoked\\n"/' "$ROOT_DIR/install.sh" | bash)"
+piped_output="$(sed 's/^  main "$@"$/  printf "piped main invoked\\n"/' "$ROOT_DIR/install-codex.sh" | bash)"
 if [[ "$piped_output" != 'piped main invoked' ]]; then
   echo '通过 curl 管道执行时必须进入主流程' >&2
   exit 1
