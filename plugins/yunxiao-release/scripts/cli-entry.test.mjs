@@ -37,6 +37,15 @@ const run = () => {
   assert.equal(tokenResult.status, 0, tokenResult.stderr);
   assert.equal(readFileSync(resolve(codexHome, '.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
 
+  const memberResult = spawnSync('node', [resolve(aliasDir, 'configure-member.mjs')], {
+    input: JSON.stringify({ displayName: '测试成员', userId: 'user-1' }),
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_HOME: codexHome },
+  });
+  assert.equal(memberResult.status, 0, memberResult.stderr);
+  assert.match(readFileSync(resolve(codexHome, '.env'), 'utf8'), /^YUNXIAO_ACCESS_TOKEN=test-token$/m);
+  assert.match(readFileSync(resolve(codexHome, '.env'), 'utf8'), /^YUNXIAO_USER_ID="user-1"$/m);
+
   const stateResult = spawnSync('node', [resolve(aliasDir, 'release-state.mjs'), '--help'], { encoding: 'utf8' });
   assert.equal(stateResult.status, 0, stateResult.stderr);
   assert.match(stateResult.stdout, /release-state\.mjs check/);

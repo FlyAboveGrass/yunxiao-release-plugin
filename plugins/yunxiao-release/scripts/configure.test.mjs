@@ -7,6 +7,11 @@ import { resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 import { buildConfig, configureProject, writeProjectConfig } from './configure-project.mjs';
+import {
+  readMemberFromEnvContent,
+  upsertMemberEnv,
+  writeCodexHomeMember,
+} from './configure-member.mjs';
 import { hasConfiguredToken, resolveEnvPath, upsertToken, writeToken } from './configure-token.mjs';
 
 // 覆盖模板生成、已有配置保留、路径边界和 Token 安全写入主路径。
@@ -92,6 +97,15 @@ const run = () => {
   assert.equal(hasConfiguredToken('YUNXIAO_ACCESS_TOKEN=\n'), false);
   assert.equal(hasConfiguredToken('YUNXIAO_ACCESS_TOKEN=token\n'), true);
   assert.throws(() => upsertToken('', 'bad\ntoken'), /包含换行符/);
+  const member = { displayName: '张三', userId: 'user-1' };
+  const memberContent = upsertMemberEnv('YUNXIAO_ACCESS_TOKEN=secret\nOTHER=value\n', member);
+  assert.deepEqual(readMemberFromEnvContent(memberContent), member);
+  assert.match(memberContent, /^YUNXIAO_ACCESS_TOKEN=secret$/m);
+  assert.doesNotMatch(memberContent, /tokenSource/);
+  assert.throws(() => upsertMemberEnv('', { ...member, displayName: '坏\n名称' }), /包含换行符/);
+  writeCodexHomeMember(envPath, member);
+  assert.deepEqual(readMemberFromEnvContent(readFileSync(envPath, 'utf8')), member);
+  assert.equal(statSync(envPath).mode & 0o777, 0o600);
   rmSync(symlinkRoot, { recursive: true, force: true });
   rmSync(outsideRoot, { recursive: true, force: true });
   rmSync(legacyRoot, { recursive: true, force: true });

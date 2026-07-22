@@ -49,12 +49,13 @@ const readToken = async () => {
   });
 };
 
-export const writeToken = (filePath, token) => {
+// 原子更新 Codex Home .env，避免 Token 或成员配置写到一半时破坏现有环境。
+export const writeEnvFile = (filePath, updateContent) => {
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
   mkdirSync(dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(temporaryPath, upsertToken(current, token), { flag: 'wx', mode: 0o600 });
+    writeFileSync(temporaryPath, updateContent(current), { flag: 'wx', mode: 0o600 });
     renameSync(temporaryPath, filePath);
     chmodSync(filePath, 0o600);
   } catch (error) {
@@ -62,6 +63,8 @@ export const writeToken = (filePath, token) => {
     throw error;
   }
 };
+
+export const writeToken = (filePath, token) => writeEnvFile(filePath, (content) => upsertToken(content, token));
 
 const main = async () => {
   const envPath = resolveEnvPath();

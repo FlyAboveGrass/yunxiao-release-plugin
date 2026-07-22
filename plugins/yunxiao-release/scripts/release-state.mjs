@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFil
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { normalizeMember, readCodexHomeMember } from './configure-member.mjs';
+
 const requiredConfigKeys = ['organizationId', 'repositoryId'];
 const configDefaults = {
   remoteName: 'origin',
@@ -157,18 +159,21 @@ export const getCurrentMr = (rootDir, sourceBranch) => {
   return records.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
 };
 
-export const checkConfig = (rootDir) => {
+// 项目配置覆盖 Codex Home 配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
+export const checkConfig = (rootDir, env = process.env) => {
   const config = getConfig(rootDir);
   const localConfigPath = resolveProjectPath(rootDir, config.localConfigFile, 'localConfigFile');
-  if (!existsSync(localConfigPath)) {
-    fail(`缺少成员本地配置: ${localConfigPath}`);
+  if (existsSync(localConfigPath)) {
+    const localConfig = normalizeMember(readJson(localConfigPath));
+    return {
+      config,
+      localConfig,
+      memberConfigSource: 'project',
+    };
   }
-  const localConfig = readJson(localConfigPath);
-  ensureKeys(localConfig, ['displayName', 'userId', 'tokenSource'], '成员本地配置');
-  if (localConfig.tokenSource !== 'environment') {
-    fail(`当前只支持 tokenSource: environment，当前为 ${localConfig.tokenSource}`);
-  }
-  return { config, localConfig };
+  const localConfig = readCodexHomeMember(env);
+  if (!localConfig) fail(`缺少成员配置: ${localConfigPath} 或 Codex Home .env`);
+  return { config, localConfig, memberConfigSource: 'codex-home' };
 };
 
 const printHelp = () => {

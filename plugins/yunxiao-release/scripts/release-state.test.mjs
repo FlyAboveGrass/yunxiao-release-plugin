@@ -23,7 +23,6 @@ const run = () => {
   writeJson(resolve(codexDir, 'yunxiao-release.local.json'), {
     displayName: '@测试成员',
     userId: 'user-1',
-    tokenSource: 'environment',
   });
   const baseRecord = {
     mrId: '10',
@@ -39,6 +38,31 @@ const run = () => {
   assert.equal(checkConfig(rootDir).config.targetBranch, 'master');
   assert.equal(checkConfig(rootDir).config.versionFile, 'package.json');
   assert.equal(checkConfig(rootDir).localConfig.userId, 'user-1');
+  assert.equal(checkConfig(rootDir).memberConfigSource, 'project');
+  const codexHome = resolve(rootDir, 'codex-home');
+  mkdirSync(codexHome);
+  writeFileSync(
+    resolve(codexHome, '.env'),
+    'YUNXIAO_DISPLAY_NAME="Home 成员"\nYUNXIAO_USER_ID="home-user"\n',
+  );
+  rmSync(resolve(codexDir, 'yunxiao-release.local.json'));
+  const homeConfig = checkConfig(rootDir, { CODEX_HOME: codexHome });
+  assert.deepEqual(homeConfig.localConfig, { displayName: 'Home 成员', userId: 'home-user' });
+  assert.equal(homeConfig.memberConfigSource, 'codex-home');
+  const emptyCodexHome = resolve(rootDir, 'empty-codex-home');
+  mkdirSync(emptyCodexHome);
+  writeFileSync(resolve(emptyCodexHome, '.env'), 'YUNXIAO_DISPLAY_NAME="不完整"\n');
+  assert.throws(
+    () => checkConfig(rootDir, { CODEX_HOME: emptyCodexHome }),
+    /Codex Home 成员配置不完整/,
+  );
+  writeJson(resolve(codexDir, 'yunxiao-release.local.json'), {
+    displayName: '@测试成员',
+    userId: 'user-1',
+    tokenSource: 'legacy-value',
+  });
+  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome }).memberConfigSource, 'project');
+  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome }).localConfig.userId, 'user-1');
   upsertMr(rootDir, baseRecord);
   upsertMr(rootDir, { ...baseRecord, title: '更新标题' });
   upsertMr(rootDir, {

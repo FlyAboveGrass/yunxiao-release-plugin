@@ -5,7 +5,8 @@
 | 类型 | 路径 | Git |
 |---|---|---|
 | 项目共享配置 | `.codex/yunxiao-release.json` | 提交 |
-| 成员本地配置 | `.codex/yunxiao-release.local.json` | 忽略 |
+| 项目成员配置 | `.codex/yunxiao-release.local.json` | 忽略 |
+| Codex Home 成员配置 | `${CODEX_HOME:-$HOME/.codex}/.env` | 不在项目中 |
 | MR 运行状态 | `.codex/runtime/yunxiao-release-mr.json` | 忽略 |
 | 评论处理文档 | `.codex/runtime/yunxiao-release-comments.md` | 忽略 |
 
@@ -14,15 +15,14 @@
 ```json
 {
   "displayName": "成员输入的本地显示名称",
-  "userId": "云效官方 MCP 返回的当前用户 ID",
-  "tokenSource": "environment"
+  "userId": "成员输入并经云效官方 MCP 核对的当前用户 ID"
 }
 ```
 
-- `displayName`、`userId`、`tokenSource` 均为必填字段。
-- `userId` 必须来自当前 Token 对应的 MCP 用户，不得从名称、邮箱、组织或仓库信息猜测。
-- `tokenSource` 当前只允许 `environment`；Token 本体保存在 Codex Home 的 `.env`，不得写入成员配置。
-- 成员配置按成员和工作区分别生成，由 `localConfigFile` 指定项目内相对路径，并必须被 Git 忽略。
+- `displayName`、`userId` 均由成员交互输入；`userId` 必须与 `get_current_user` 返回值精确一致后才能写入。
+- 项目成员配置优先；缺失时读取 Codex Home `.env` 中的 `YUNXIAO_DISPLAY_NAME` 和 `YUNXIAO_USER_ID`。
+- 项目存储由 `localConfigFile` 指定项目内相对路径并必须被 Git 忽略；Codex Home 存储对同一 Codex Home 下的项目和 worktree 生效。
+- `tokenSource` 不再持久化，固定按 `environment` 处理；旧项目文件中的该字段兼容但忽略。
 - 切换 Token 或云效账号后必须重新验证身份并更新成员配置。
 
 成员配置禁止保存 Token、Authorization 头或任何可还原 Token 的信息。
@@ -40,7 +40,7 @@
 | `reviewerUserIds` | `[]` | `search_organization_members` 返回并由用户确认的 `userId` 白名单；代码库权限另行确认 |
 | `versionFile` | `package.json` | 项目现有版本来源；显式设为 `null` 时跳过版本修改 |
 | `announcementFile` | `null` | 项目现有发版公告；`null` 跳过公告修改 |
-| `localConfigFile` | `.codex/yunxiao-release.local.json` | 项目内成员配置路径，必须被 Git 忽略 |
+| `localConfigFile` | `.codex/yunxiao-release.local.json` | 可覆盖 Codex Home 配置的项目成员配置路径，必须被 Git 忽略 |
 | `runtimeFile` | `.codex/runtime/yunxiao-release-mr.json` | 项目内 MR 状态路径，必须被 Git 忽略 |
 | `commentsFile` | `.codex/runtime/yunxiao-release-comments.md` | 项目内评论记录路径，必须被 Git 忽略 |
 | `validationCommands` | `["git diff --check"]` | 项目规则和 CI 的最低验证命令，必须是非空数组；执行前逐条展示并确认 |
