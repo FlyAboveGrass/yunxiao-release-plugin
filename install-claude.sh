@@ -57,18 +57,16 @@ configure_claude_plugin() {
 
 configure_claude_token() {
   local project_root="$1"
-  local terminal_path="${2:-/dev/tty}"
   local plugin_id="$PLUGIN@$MARKETPLACE"
   echo '即将打开 Claude Code 插件配置。已有 Token 会保留；完成后退出会话，安装脚本将继续。'
-  (cd "$project_root" && claude "/plugin configure $plugin_id" <"$terminal_path" >"$terminal_path" 2>&1)
+  (cd "$project_root" && claude "/plugin configure $plugin_id")
 }
 
 start_claude_configuration() {
   local project_root="$1"
-  local terminal_path="${2:-/dev/tty}"
   local prompt='/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
   echo '插件安装完成，正在启动 Claude Code 云效交互配置……'
-  (cd "$project_root" && claude "$prompt" <"$terminal_path" >"$terminal_path" 2>&1)
+  (cd "$project_root" && claude "$prompt")
 }
 
 # 主流程复用现有项目配置脚本；Token 由 Claude Code 的敏感 userConfig 管理。
@@ -95,7 +93,9 @@ main() {
   (cd "$PROJECT_ROOT" && node "$project_script")
   test -f "$PROJECT_ROOT/.agents/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
-  configure_claude_token "$PROJECT_ROOT"
+  if [[ "${YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN:-0}" != 1 ]]; then
+    configure_claude_token "$PROJECT_ROOT"
+  fi
   if [[ "${YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG:-0}" != 1 ]]; then
     start_claude_configuration "$PROJECT_ROOT"
   fi

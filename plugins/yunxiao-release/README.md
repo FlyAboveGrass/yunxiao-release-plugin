@@ -33,7 +33,7 @@ npx github:FlyAboveGrass/yunxiao-release-plugin
 
 当前命令直接从 GitHub 运行。npm 包发布后可使用更短的 `npx yunxiao-release`；两个入口调用同一套安装逻辑。
 
-复选框默认勾选两个 Agent；使用方向键移动、空格切换、回车确认。两个宿主都会安装，但成员交互配置只启动 Codex；只选择 Claude Code 时才用 Claude Code 配置。Claude Code 的原生 Token 配置仍由 Claude Code 自己完成。
+复选框默认勾选两个 Agent；使用方向键移动、空格切换、回车确认。双选时两个宿主都会安装，但只启动 Codex 完成成员配置；Claude Code Token 延后到首次使用 Claude Code 插件时通过原生 `/plugin configure` 配置。只选择 Claude Code 时，安装流程仍由 Claude Code 完成 Token 和成员配置。
 
 选择 Codex 后，安装脚本会依次：
 

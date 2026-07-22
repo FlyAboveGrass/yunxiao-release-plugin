@@ -85,8 +85,7 @@ start_selected_configuration() {
     return
   fi
   echo '插件安装完成，正在启动 Claude Code 云效交互配置……'
-  (cd "$project_root" && claude '/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。' \
-    <"$terminal_path" >"$terminal_path" 2>&1)
+  (cd "$project_root" && claude '/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。' <"$terminal_path")
 }
 
 # 统一入口只负责选择宿主，具体安装和认证仍由已验证的宿主脚本处理。
@@ -102,7 +101,12 @@ main() {
   trap 'rm -rf "$TEMPORARY_DIR"' EXIT
   while IFS= read -r installer; do
     installer_path="$(resolve_installer "$installer" "$TEMPORARY_DIR")"
-    YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG=1 bash "$installer_path" </dev/tty
+    if [[ "$installer" == 'install-claude.sh' && "$installers" == *'install-codex.sh'* ]]; then
+      YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG=1 YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN=1 \
+        bash "$installer_path" </dev/tty
+    else
+      YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG=1 bash "$installer_path" </dev/tty
+    fi
   done <<<"$installers"
   start_selected_configuration "$installers" "$project_root"
 }

@@ -94,9 +94,8 @@ fi
 
 : >"$TEST_DIR/calls"
 mkdir -p "$TEST_DIR/project"
-: >"$TEST_DIR/fake-tty"
-configure_claude_token "$TEST_DIR/project" "$TEST_DIR/fake-tty"
-start_claude_configuration "$TEST_DIR/project" "$TEST_DIR/fake-tty"
+configure_claude_token "$TEST_DIR/project"
+start_claude_configuration "$TEST_DIR/project"
 expected_calls=$'/plugin configure yunxiao-release@yunxiao-release-community\n/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
 if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
   echo 'Claude 交互配置启动参数不符合预期' >&2

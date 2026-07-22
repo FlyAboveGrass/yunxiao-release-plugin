@@ -26,6 +26,11 @@ if [[ "$(<"$TEST_DIR/fake-tty")" != $'codex stdout\ncodex stderr' ]]; then
   exit 1
 fi
 unset -f codex claude
+if ! grep -Fq 'YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN=1' "$ROOT_DIR/install.sh" ||
+  ! grep -Fq 'YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN' "$ROOT_DIR/install-claude.sh"; then
+  echo '双选时必须延后 Claude Token 配置，避免启动第二个交互终端' >&2
+  exit 1
+fi
 
 resolved_installer="$(resolve_installer install-codex.sh "$TEST_DIR")"
 if [[ "$resolved_installer" != "$ROOT_DIR/install-codex.sh" ]]; then
