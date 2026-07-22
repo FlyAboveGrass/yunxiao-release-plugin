@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yunxiao-release",
+  "displayName": "云效单 MR 发版",
+  "version": "0.4.0",
+  "description": "通过阿里云云效官方 MCP 组织任意 Git 项目的单 MR 开发、评审与发版准备流程。",
+  "author": {
+    "name": "FlyAboveGrass"
+  },
+  "repository": "https://github.com/FlyAboveGrass/yunxiao-release-plugin",
+  "license": "MIT",
+  "mcpServers": "./.mcp.claude.json",
+  "userConfig": {
+    "yunxiao_access_token": {
+      "type": "string",
+      "title": "云效 Access Token",
+      "description": "用于访问阿里云云效官方 MCP。",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

@@ -5,17 +5,17 @@ description: 基于临时评论文档分析云效 MR 的未解决评论，完成
 
 # 云效评审修复
 
-先阅读 [发版契约](../../references/release-contract.md)。评论文档不存在或已过期时先运行 `$yunxiao-release-comments`。
+先阅读 [发版契约](../../references/release-contract.md)。评论文档不存在或已过期时先运行 `yunxiao-release-comments` Skill。
 
 ## 流程
 
 1. 按评论 ID 逐条读取未解决评论及对应文件、行号和回复链。
 2. 阅读实际代码和所有相关调用方，判断评论正确、过期、重复或冲突。
 3. 定位根因并给出最小修改方案；不得为了关闭评论而修改正确代码。
-4. 获得用户确认后修改业务代码，并按 `AGENTS.md` 使用相应项目 Skill 和验证命令。
+4. 获得用户确认后修改业务代码，并按适用的 `AGENTS.md`、`CLAUDE.md` 使用相应项目 Skill 和验证命令。
 5. 在评论文档记录分析、实际修改和验证证据。
 6. 获得单独确认后提交、推送；提交必须遵循项目规则和 Conventional Commits，项目存在提交 Skill 时优先使用。
-7. 重新运行 `$yunxiao-release-comments`，按评论 ID 识别新增、更新和已解决评论。
+7. 重新运行 `yunxiao-release-comments` Skill，按评论 ID 识别新增、更新和已解决评论。
 8. 回复或解决评论前再次确认，并仅调用真实 MCP 评论工具。
 
 ## 停止条件

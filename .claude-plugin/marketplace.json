@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "yunxiao-release-community",
+  "description": "通过云效官方 MCP 提供单 MR 发版工作流。",
+  "owner": {
+    "name": "FlyAboveGrass"
+  },
+  "plugins": [
+    {
+      "name": "yunxiao-release",
+      "source": "./plugins/yunxiao-release",
+      "description": "通过阿里云云效官方 MCP 组织任意 Git 项目的单 MR 开发、评审与发版准备流程。",
+      "category": "productivity"
+    }
+  ]
+}

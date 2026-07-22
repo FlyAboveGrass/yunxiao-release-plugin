@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "yunxiao": {
+      "type": "http",
+      "url": "https://openapi-rdc.aliyuncs.com/ai/mcp?toolsets=organization-management,code-management,pipeline-management",
+      "headers": {
+        "Authorization": "Bearer ${user_config.yunxiao_access_token}"
+      }
+    }
+  }
+}
