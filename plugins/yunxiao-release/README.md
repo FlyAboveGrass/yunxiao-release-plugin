@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
   "reviewMode": "ask",
   "reviewerMode": "ask",
   "reviewerUserIds": [],
-  "versionFile": null,
+  "versionFile": "package.json",
   "announcementFile": null,
   "localConfigFile": ".codex/yunxiao-release.local.json",
   "runtimeFile": ".codex/runtime/yunxiao-release-mr.json",
@@ -82,7 +82,7 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
 | `reviewMode` | 创建或恢复 MR 后，插件是否进入评论同步和修复流程 | `ask` | 项目团队决定，值及行为见下文 |
 | `reviewerMode` | 创建 MR 时如何从评审人白名单选择人员 | `ask` | 项目团队决定，值及行为见下文 |
 | `reviewerUserIds` | 当前项目确认过的评审人用户 ID 白名单 | `[]`；`ask` 模式不指定评审人，`fixed` 模式报配置错误 | 配置 Skill 用 `search_organization_members` 搜索成员，用户确认后取返回的 `userId`；代码库权限由项目维护者另行确认 |
-| `versionFile` | 收尾时需要更新的项目内版本文件 | `null`，跳过版本修改 | 从项目现有版本来源选择，如 `package.json`、`VERSION`；项目没有统一版本文件时保持 `null` |
+| `versionFile` | 收尾时需要更新的项目内版本文件 | `package.json` | 使用项目现有版本来源；不是 `package.json` 时改为实际路径，没有统一版本文件时显式设为 `null` 跳过 |
 | `announcementFile` | 收尾时需要更新的项目内发版公告 | `null`，跳过公告修改 | 使用项目现有且团队确认的公告文件；项目没有公告文件时保持 `null` |
 | `localConfigFile` | 当前成员本地身份配置路径 | `.codex/yunxiao-release.local.json` | 插件内部路径，通常无需修改；必须是项目内相对路径并被 Git 忽略 |
 | `runtimeFile` | 当前分支与 MR 运行状态路径 | `.codex/runtime/yunxiao-release-mr.json` | 插件内部路径，通常无需修改；必须是项目内相对路径并被 Git 忽略 |

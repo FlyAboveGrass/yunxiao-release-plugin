@@ -13,7 +13,7 @@ const defaultConfig = {
   reviewMode: 'ask',
   reviewerMode: 'ask',
   reviewerUserIds: [],
-  versionFile: null,
+  versionFile: 'package.json',
   announcementFile: null,
   localConfigFile: '.codex/yunxiao-release.local.json',
   runtimeFile: '.codex/runtime/yunxiao-release-mr.json',

@@ -38,7 +38,7 @@
 | `reviewMode` | `ask` | 项目 Review 流程策略，只允许 `ask|required|skip` |
 | `reviewerMode` | `ask` | MR 评审人选择策略，只允许 `ask|fixed` |
 | `reviewerUserIds` | `[]` | `search_organization_members` 返回并由用户确认的 `userId` 白名单；代码库权限另行确认 |
-| `versionFile` | `null` | 项目现有版本来源；`null` 跳过版本修改 |
+| `versionFile` | `package.json` | 项目现有版本来源；显式设为 `null` 时跳过版本修改 |
 | `announcementFile` | `null` | 项目现有发版公告；`null` 跳过公告修改 |
 | `localConfigFile` | `.codex/yunxiao-release.local.json` | 项目内成员配置路径，必须被 Git 忽略 |
 | `runtimeFile` | `.codex/runtime/yunxiao-release-mr.json` | 项目内 MR 状态路径，必须被 Git 忽略 |
@@ -51,7 +51,7 @@
 - `required`：收尾前必须完整同步评论，并处理或确认没有阻塞性的未解决评论。
 - `skip`：不主动同步或处理评论，直接提示进入收尾。
 
-`reviewMode` 不修改云效审批规则，也不能证明 MR 已审批通过。版本文件和公告文件为可选能力，不得假设项目使用 `package.json` 或固定文档路径。
+`reviewMode` 不修改云效审批规则，也不能证明 MR 已审批通过。版本文件默认使用 `package.json`，但必须服从项目配置的实际路径；公告文件仍为可选能力，不得假设固定文档路径。
 
 评审人配置使用以下字段：
 

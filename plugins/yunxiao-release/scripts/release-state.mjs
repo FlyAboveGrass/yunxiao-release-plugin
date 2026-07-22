@@ -9,7 +9,7 @@ const configDefaults = {
   remoteName: 'origin',
   targetBranch: 'master',
   reviewMode: 'ask',
-  versionFile: null,
+  versionFile: 'package.json',
   announcementFile: null,
   localConfigFile: '.codex/yunxiao-release.local.json',
   runtimeFile: '.codex/runtime/yunxiao-release-mr.json',

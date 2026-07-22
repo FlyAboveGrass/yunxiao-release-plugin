@@ -37,6 +37,7 @@ const run = () => {
     lastSyncedAt: '2026-07-16T01:01:00.000Z',
   };
   assert.equal(checkConfig(rootDir).config.targetBranch, 'master');
+  assert.equal(checkConfig(rootDir).config.versionFile, 'package.json');
   assert.equal(checkConfig(rootDir).localConfig.userId, 'user-1');
   upsertMr(rootDir, baseRecord);
   upsertMr(rootDir, { ...baseRecord, title: '更新标题' });

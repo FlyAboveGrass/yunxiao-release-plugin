@@ -19,7 +19,8 @@ const run = () => {
   assert.equal(config.remoteName, 'origin');
   assert.equal(config.reviewerMode, 'ask');
   assert.deepEqual(config.reviewerUserIds, []);
-  assert.equal(config.versionFile, null);
+  assert.equal(config.versionFile, 'package.json');
+  assert.equal(buildConfig({ versionFile: null }).versionFile, null);
   assert.equal(buildConfig({ targetBranch: 'main', versionFile: 'VERSION' }).targetBranch, 'main');
   assert.throws(() => writeProjectConfig(rootDir, config), /不是 Git 仓库/);
   execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
