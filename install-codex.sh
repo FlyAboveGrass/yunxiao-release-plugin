@@ -76,9 +76,10 @@ configure_token() {
 # 新进程会重新加载刚安装的插件和 Codex Home 环境，并保留后续交互能力。
 start_project_configuration() {
   local project_root="$1"
+  local terminal_path="${2:-/dev/tty}"
   local prompt='$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
   echo '插件安装完成，正在启动云效交互配置……'
-  codex -C "$project_root" "$prompt"
+  codex -C "$project_root" "$prompt" <"$terminal_path" >"$terminal_path" 2>&1
 }
 
 # 主流程依次验证环境、配置 Token、安装插件并初始化当前 Git 项目。
@@ -109,7 +110,9 @@ main() {
   (cd "$PROJECT_ROOT" && node "$project_script")
   test -f "$PROJECT_ROOT/.agents/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
-  start_project_configuration "$PROJECT_ROOT" </dev/tty
+  if [[ "${YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG:-0}" != 1 ]]; then
+    start_project_configuration "$PROJECT_ROOT"
+  fi
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

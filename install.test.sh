@@ -8,6 +8,25 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
+codex() {
+  printf 'codex %s\n' "$*" >>"$TEST_DIR/selected-agent-calls"
+  printf 'codex stdout\n'
+  printf 'codex stderr\n' >&2
+}
+claude() { printf 'claude %s\n' "$*" >>"$TEST_DIR/selected-agent-calls"; }
+: >"$TEST_DIR/selected-agent-calls"
+: >"$TEST_DIR/fake-tty"
+start_selected_configuration $'install-codex.sh\ninstall-claude.sh' "$TEST_DIR/project" "$TEST_DIR/fake-tty"
+if [[ "$(<"$TEST_DIR/selected-agent-calls")" != "codex -C $TEST_DIR/project \$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。" ]]; then
+  echo '同时安装两个宿主时必须只启动 Codex 成员配置' >&2
+  exit 1
+fi
+if [[ "$(<"$TEST_DIR/fake-tty")" != $'codex stdout\ncodex stderr' ]]; then
+  echo 'Codex TUI 的输出和错误必须连接到同一个终端' >&2
+  exit 1
+fi
+unset -f codex claude
+
 resolved_installer="$(resolve_installer install-codex.sh "$TEST_DIR")"
 if [[ "$resolved_installer" != "$ROOT_DIR/install-codex.sh" ]]; then
   echo '本地安装包必须复用包内同版本脚本' >&2
@@ -198,15 +217,16 @@ fi
 
 : >"$TEST_DIR/calls"
 MOCK_MODE='launch'
-start_project_configuration "$TEST_DIR/project" >"$TEST_DIR/configuration-output"
+: >"$TEST_DIR/fake-tty"
+start_project_configuration "$TEST_DIR/project" "$TEST_DIR/fake-tty" >"$TEST_DIR/configuration-output"
 expected_calls="-C $TEST_DIR/project \$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。"
 actual_calls="$(<"$TEST_DIR/calls")"
 if [[ "$actual_calls" != "$expected_calls" ]]; then
   printf '交互配置启动参数不符合预期：\n%s\n' "$actual_calls" >&2
   exit 1
 fi
-if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
-  echo '新 Codex 交互配置必须继承控制终端' >&2
+if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT"' "$ROOT_DIR/install-codex.sh"; then
+  echo '独立 Codex 安装必须启动成员配置' >&2
   exit 1
 fi
 

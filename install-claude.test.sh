@@ -8,7 +8,7 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 claude plugin validate "$ROOT_DIR" --strict
 claude plugin validate "$ROOT_DIR/plugins/yunxiao-release" --strict
-node -e 'const fs=require("fs");const root=process.argv[1];const codex=JSON.parse(fs.readFileSync(`${root}/plugins/yunxiao-release/.codex-plugin/plugin.json`));const claude=JSON.parse(fs.readFileSync(`${root}/plugins/yunxiao-release/.claude-plugin/plugin.json`));if(codex.version!==claude.version)process.exit(1)' "$ROOT_DIR"
+node -e 'const fs=require("fs");const root=process.argv[1];const codex=JSON.parse(fs.readFileSync(`${root}/plugins/yunxiao-release/.codex-plugin/plugin.json`));const claude=JSON.parse(fs.readFileSync(`${root}/plugins/yunxiao-release/.claude-plugin/plugin.json`));const pkg=JSON.parse(fs.readFileSync(`${root}/package.json`));if(codex.version!==claude.version||codex.version!==pkg.version)process.exit(1)' "$ROOT_DIR"
 
 source "$ROOT_DIR/install-claude.sh"
 
@@ -94,8 +94,9 @@ fi
 
 : >"$TEST_DIR/calls"
 mkdir -p "$TEST_DIR/project"
-configure_claude_token "$TEST_DIR/project"
-start_claude_configuration "$TEST_DIR/project"
+: >"$TEST_DIR/fake-tty"
+configure_claude_token "$TEST_DIR/project" "$TEST_DIR/fake-tty"
+start_claude_configuration "$TEST_DIR/project" "$TEST_DIR/fake-tty"
 expected_calls=$'/plugin configure yunxiao-release@yunxiao-release-community\n/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
 if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
   echo 'Claude 交互配置启动参数不符合预期' >&2

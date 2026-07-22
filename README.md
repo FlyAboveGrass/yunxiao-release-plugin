@@ -8,6 +8,8 @@
 npx github:FlyAboveGrass/yunxiao-release-plugin
 ```
 
+同时选择两个宿主时都会安装，但成员交互配置只启动 Codex；只选择 Claude Code 时才用 Claude Code 配置。
+
 发布到 npm 后，入口可进一步缩短为 `npx yunxiao-release`。
 
 本项目采用 [MIT License](LICENSE)。
