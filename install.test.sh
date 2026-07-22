@@ -8,27 +8,9 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
-codex() {
-  printf 'codex %s\n' "$*" >>"$TEST_DIR/selected-agent-calls"
-  printf 'codex stdout\n'
-  printf 'codex stderr\n' >&2
-}
-claude() { printf 'claude %s\n' "$*" >>"$TEST_DIR/selected-agent-calls"; }
-: >"$TEST_DIR/selected-agent-calls"
-: >"$TEST_DIR/fake-tty"
-start_selected_configuration $'install-codex.sh\ninstall-claude.sh' "$TEST_DIR/project" "$TEST_DIR/fake-tty"
-if [[ "$(<"$TEST_DIR/selected-agent-calls")" != "codex -C $TEST_DIR/project \$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。" ]]; then
-  echo '同时安装两个宿主时必须只启动 Codex 成员配置' >&2
-  exit 1
-fi
-if [[ "$(<"$TEST_DIR/fake-tty")" != $'codex stdout\ncodex stderr' ]]; then
-  echo 'Codex TUI 的输出和错误必须连接到同一个终端' >&2
-  exit 1
-fi
-unset -f codex claude
-if ! grep -Fq 'YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN=1' "$ROOT_DIR/install.sh" ||
-  ! grep -Fq 'YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN' "$ROOT_DIR/install-claude.sh"; then
-  echo '双选时必须延后 Claude Token 配置，避免启动第二个交互终端' >&2
+if grep -Eq 'codex -C|claude "/plugin configure|claude "\$prompt"' \
+  "$ROOT_DIR/install.sh" "$ROOT_DIR/install-codex.sh" "$ROOT_DIR/install-claude.sh"; then
+  echo '安装脚本不得自动启动 Codex 或 Claude Code 交互配置' >&2
   exit 1
 fi
 
@@ -108,9 +90,6 @@ codex() {
       ;;
     'plugin marketplace remove yunxiao-release-community')
       printf 'Removed marketplace.\n'
-      ;;
-    -C\ *)
-      [[ "$MOCK_MODE" == 'launch' ]] || { echo "未预期的 Codex 调用: $*" >&2; return 1; }
       ;;
     *)
       echo "未预期的 Codex 调用: $*" >&2
@@ -217,21 +196,6 @@ if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install-codex.sh"; then
 fi
 if ! grep -Fq 'configure_token "$token_script" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
   echo 'curl 管道安装时 Token 必须从控制终端读取' >&2
-  exit 1
-fi
-
-: >"$TEST_DIR/calls"
-MOCK_MODE='launch'
-: >"$TEST_DIR/fake-tty"
-start_project_configuration "$TEST_DIR/project" "$TEST_DIR/fake-tty" >"$TEST_DIR/configuration-output"
-expected_calls="-C $TEST_DIR/project \$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。"
-actual_calls="$(<"$TEST_DIR/calls")"
-if [[ "$actual_calls" != "$expected_calls" ]]; then
-  printf '交互配置启动参数不符合预期：\n%s\n' "$actual_calls" >&2
-  exit 1
-fi
-if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT"' "$ROOT_DIR/install-codex.sh"; then
-  echo '独立 Codex 安装必须启动成员配置' >&2
   exit 1
 fi
 

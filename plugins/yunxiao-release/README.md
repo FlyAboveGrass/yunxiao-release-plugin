@@ -33,7 +33,7 @@ npx github:FlyAboveGrass/yunxiao-release-plugin
 
 当前命令直接从 GitHub 运行。npm 包发布后可使用更短的 `npx yunxiao-release`；两个入口调用同一套安装逻辑。
 
-复选框默认勾选两个 Agent；使用方向键移动、空格切换、回车确认。双选时两个宿主都会安装，但只启动 Codex 完成成员配置；Claude Code Token 延后到首次使用 Claude Code 插件时通过原生 `/plugin configure` 配置。只选择 Claude Code 时，安装流程仍由 Claude Code 完成 Token 和成员配置。
+复选框默认勾选两个 Agent；使用方向键移动、空格切换、回车确认。安装脚本只安装所选插件并生成共享项目配置，不会自动启动 Codex 或 Claude Code。
 
 选择 Codex 后，安装脚本会依次：
 
@@ -41,11 +41,18 @@ npx github:FlyAboveGrass/yunxiao-release-plugin
 2. 首次输入时将 Token 写入 Codex Home `.env`，保留其他变量并设置权限为 `600`。
 3. 从 GitHub 添加 marketplace 并安装插件。
 4. 在当前 Git 项目生成 `.agents/yunxiao-release.json` 和必要的 `.gitignore` 规则。
-5. 启动新的 Codex 交互式会话，并自动发送 `$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。`。
 
-脚本不会打印 Token，也不会将 Token 放入命令参数或 shell 历史。这里检测和保存的是云效 `YUNXIAO_ACCESS_TOKEN`，与 Apifox Token 无关。交互配置完成并退出 Codex 后，安装脚本结束。
+脚本不会打印 Token，也不会将 Token 放入命令参数或 shell 历史。这里检测和保存的是云效 `YUNXIAO_ACCESS_TOKEN`，与 Apifox Token 无关。
 
-选择 Claude Code 后，安装脚本使用用户级插件作用域：已安装时只更新。脚本随后打开原生 `/plugin configure yunxiao-release@yunxiao-release-community`；已有 Token 会保留，缺失时由 Claude Code 隐藏读取并安全保存。退出该会话后，脚本再启动 `/yunxiao-release:yunxiao-release-config` 配置成员身份。
+选择 Claude Code 后，安装脚本使用用户级插件作用域：已安装时只更新。安装完成后手动启动对应宿主；Codex 直接执行配置 Skill，Claude Code 先通过原生 `/plugin configure` 配置 Token，再执行配置 Skill：
+
+```text
+$yunxiao-release:yunxiao-release-config 交互配置当前成员身份，并保存到用户级通用配置。
+/plugin configure yunxiao-release@yunxiao-release-community
+/yunxiao-release:yunxiao-release-config 交互配置当前成员身份，并保存到用户级通用配置。
+```
+
+用户级成员身份写入 `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/member.json`，由 Codex 和 Claude Code 共用。
 
 普通项目默认只向 `.gitignore` 追加两条规则：
 

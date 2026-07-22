@@ -8,7 +8,36 @@
 npx github:FlyAboveGrass/yunxiao-release-plugin
 ```
 
-同时选择两个宿主时都会安装，但只启动 Codex 完成成员配置；Claude Code Token 延后到首次使用 Claude Code 插件时配置。
+安装脚本会安装所选插件并生成共享的 `.agents/yunxiao-release.json`，不会自动启动 Codex 或 Claude Code。
+
+安装后进入目标项目，手动启动所需宿主并完成配置。
+
+Codex：
+
+```bash
+codex
+```
+
+在 Codex 中发送：
+
+```text
+$yunxiao-release:yunxiao-release-config 交互配置当前成员身份，并保存到用户级通用配置。
+```
+
+Claude Code：
+
+```bash
+claude
+```
+
+在 Claude Code 中依次发送：
+
+```text
+/plugin configure yunxiao-release@yunxiao-release-community
+/yunxiao-release:yunxiao-release-config 交互配置当前成员身份，并保存到用户级通用配置。
+```
+
+成员身份由两个宿主共用，保存到 `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/member.json`。
 
 发布到 npm 后，入口可进一步缩短为 `npx yunxiao-release`。
 

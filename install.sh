@@ -75,40 +75,20 @@ choose_installers() {
   return 0
 }
 
-# 两个宿主同时安装时只进入一次成员配置，并固定优先使用 Codex。
-start_selected_configuration() {
-  local installers="$1" project_root="$2" terminal_path="${3:-/dev/tty}"
-  if [[ "$installers" == *'install-codex.sh'* ]]; then
-    echo '插件安装完成，正在启动 Codex 云效交互配置……'
-    codex -C "$project_root" '$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。' \
-      <"$terminal_path" >"$terminal_path" 2>&1
-    return
-  fi
-  echo '插件安装完成，正在启动 Claude Code 云效交互配置……'
-  (cd "$project_root" && claude '/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。' <"$terminal_path")
-}
-
 # 统一入口只负责选择宿主，具体安装和认证仍由已验证的宿主脚本处理。
 main() {
   command -v git >/dev/null || { echo '缺少命令：git' >&2; exit 1; }
   git rev-parse --show-toplevel >/dev/null 2>&1 || { echo '请在 Git 项目内执行安装命令' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
-  local installers installer installer_path project_root
+  local installers installer installer_path
   installers="$(choose_installers)"
-  project_root="$(git rev-parse --show-toplevel)"
   readonly TEMPORARY_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMPORARY_DIR"' EXIT
   while IFS= read -r installer; do
     installer_path="$(resolve_installer "$installer" "$TEMPORARY_DIR")"
-    if [[ "$installer" == 'install-claude.sh' && "$installers" == *'install-codex.sh'* ]]; then
-      YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG=1 YUNXIAO_RELEASE_DEFER_CLAUDE_TOKEN=1 \
-        bash "$installer_path" </dev/tty
-    else
-      YUNXIAO_RELEASE_DEFER_MEMBER_CONFIG=1 bash "$installer_path" </dev/tty
-    fi
+    bash "$installer_path" </dev/tty
   done <<<"$installers"
-  start_selected_configuration "$installers" "$project_root"
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

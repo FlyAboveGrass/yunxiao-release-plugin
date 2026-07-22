@@ -49,7 +49,7 @@ claude() {
         return 1
       fi
       ;;
-    'plugin marketplace add FlyAboveGrass/yunxiao-release-plugin'|'plugin marketplace update yunxiao-release-community'|'plugin install yunxiao-release@yunxiao-release-community --scope user'|'plugin update yunxiao-release@yunxiao-release-community --scope user'|'/plugin configure yunxiao-release@yunxiao-release-community'|'/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。')
+    'plugin marketplace add FlyAboveGrass/yunxiao-release-plugin'|'plugin marketplace update yunxiao-release-community'|'plugin install yunxiao-release@yunxiao-release-community --scope user'|'plugin update yunxiao-release@yunxiao-release-community --scope user')
       ;;
     *)
       echo "未预期的 Claude 调用: $*" >&2
@@ -106,16 +106,6 @@ configure_claude_plugin
 expected_calls=$'plugin list --json\nplugin install yunxiao-release@yunxiao-release-community --scope user'
 if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
   echo '项目级插件不应阻止用户级安装' >&2
-  exit 1
-fi
-
-: >"$TEST_DIR/calls"
-mkdir -p "$TEST_DIR/project"
-configure_claude_token "$TEST_DIR/project"
-start_claude_configuration "$TEST_DIR/project"
-expected_calls=$'/plugin configure yunxiao-release@yunxiao-release-community\n/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
-if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
-  echo 'Claude 交互配置启动参数不符合预期' >&2
   exit 1
 fi
 
