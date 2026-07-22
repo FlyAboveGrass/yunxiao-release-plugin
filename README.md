@@ -5,7 +5,9 @@
 在目标 Git 项目中运行统一安装入口，再通过复选框选择 Codex、Claude Code 或两者：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main/install.sh | bash
+npx github:FlyAboveGrass/yunxiao-release-plugin
 ```
+
+发布到 npm 后，入口可进一步缩短为 `npx yunxiao-release`。
 
 本项目采用 [MIT License](LICENSE)。

@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = resolve(scriptsDir, '../../..');
+const publicCli = resolve(repositoryRoot, 'bin/yunxiao-release.mjs');
 
 // 通过目录别名启动真实 CLI，覆盖 macOS /var 与 /private/var 路径不一致的入口判断。
 const run = () => {
@@ -15,6 +17,7 @@ const run = () => {
   const aliasDir = resolve(rootDir, 'scripts-alias');
   const projectDir = resolve(rootDir, 'project');
   const codexHome = resolve(rootDir, 'codex-home');
+  const xdgConfigHome = resolve(rootDir, 'xdg-config');
   symlinkSync(scriptsDir, aliasDir, 'dir');
   execFileSync('git', ['init', projectDir], { stdio: 'ignore' });
 
@@ -24,7 +27,7 @@ const run = () => {
   });
   assert.equal(projectResult.status, 0, projectResult.stderr);
   assert.match(projectResult.stdout, /项目配置已写入/);
-  const projectConfig = JSON.parse(readFileSync(resolve(projectDir, '.codex/yunxiao-release.json')));
+  const projectConfig = JSON.parse(readFileSync(resolve(projectDir, '.agents/yunxiao-release.json')));
   assert.equal(projectConfig.targetBranch, 'master');
   assert.equal(projectConfig.reviewerMode, 'ask');
   assert.deepEqual(projectConfig.reviewerUserIds, []);
@@ -60,15 +63,27 @@ const run = () => {
   const memberResult = spawnSync('node', [resolve(aliasDir, 'configure-member.mjs')], {
     input: JSON.stringify({ displayName: '测试成员', userId: 'user-1' }),
     encoding: 'utf8',
-    env: { ...process.env, CODEX_HOME: codexHome },
+    env: { ...process.env, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(memberResult.status, 0, memberResult.stderr);
-  assert.match(readFileSync(resolve(codexHome, '.env'), 'utf8'), /^YUNXIAO_ACCESS_TOKEN=test-token$/m);
-  assert.match(readFileSync(resolve(codexHome, '.env'), 'utf8'), /^YUNXIAO_USER_ID="user-1"$/m);
+  assert.equal(readFileSync(resolve(codexHome, '.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
+  assert.deepEqual(JSON.parse(readFileSync(resolve(xdgConfigHome, 'yunxiao-release/member.json'))), {
+    displayName: '测试成员',
+    userId: 'user-1',
+  });
 
   const stateResult = spawnSync('node', [resolve(aliasDir, 'release-state.mjs'), '--help'], { encoding: 'utf8' });
   assert.equal(stateResult.status, 0, stateResult.stderr);
   assert.match(stateResult.stdout, /release-state\.mjs check/);
+
+  const helpResult = spawnSync('node', [publicCli, '--help'], { encoding: 'utf8' });
+  assert.equal(helpResult.status, 0, helpResult.stderr);
+  assert.match(helpResult.stdout, /yunxiao-release configure/);
+  const cliProject = resolve(rootDir, 'cli-project');
+  execFileSync('git', ['init', cliProject], { stdio: 'ignore' });
+  const configureResult = spawnSync('node', [publicCli, 'configure'], { cwd: cliProject, encoding: 'utf8' });
+  assert.equal(configureResult.status, 0, configureResult.stderr);
+  assert.equal(JSON.parse(readFileSync(resolve(cliProject, '.agents/yunxiao-release.json'))).targetBranch, 'master');
 
   rmSync(rootDir, { recursive: true, force: true });
   console.log('cli entry self-test passed');

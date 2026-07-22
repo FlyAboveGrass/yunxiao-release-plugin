@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveEnvPath, writeEnvFile } from './configure-token.mjs';
+import { resolveCodexEnvPath } from './configure-token.mjs';
 
 const memberKeys = {
   displayName: 'YUNXIAO_DISPLAY_NAME',
@@ -36,25 +39,38 @@ export const readMemberFromEnvContent = (content) => {
   );
   const configuredCount = Object.values(member).filter((value) => value !== undefined).length;
   if (configuredCount === 0) return null;
-  if (configuredCount !== Object.keys(memberKeys).length) throw new Error('Codex Home 成员配置不完整');
+  if (configuredCount !== Object.keys(memberKeys).length) throw new Error('旧 Codex Home 成员配置不完整');
   return normalizeMember(member);
 };
 
-export const upsertMemberEnv = (content, rawMember) => {
-  const member = normalizeMember(rawMember);
-  const keys = new Set(Object.values(memberKeys));
-  const retainedLines = content.split(/\r?\n/).filter((line) => !keys.has(line.slice(0, line.indexOf('='))));
-  const memberLines = Object.entries(memberKeys).map(([field, key]) => `${key}=${JSON.stringify(member[field])}`);
-  return `${[...retainedLines.filter(Boolean), ...memberLines].join('\n')}\n`;
+export const resolveUserMemberPath = (env = process.env) => {
+  const userHome = [env.HOME, env.USERPROFILE].find((candidate) => candidate && isAbsolute(candidate)) || homedir();
+  const configHome = env.XDG_CONFIG_HOME && isAbsolute(env.XDG_CONFIG_HOME)
+    ? env.XDG_CONFIG_HOME
+    : resolve(userHome, '.config');
+  return resolve(configHome, 'yunxiao-release/member.json');
 };
 
-export const writeCodexHomeMember = (filePath, member) =>
-  writeEnvFile(filePath, (content) => upsertMemberEnv(content, member));
+// 用户身份写入宿主无关的 XDG 路径；旧 Codex Home 只作为读取兼容层。
+export const writeUserMember = (filePath, rawMember) => {
+  const member = normalizeMember(rawMember);
+  mkdirSync(dirname(filePath), { recursive: true, mode: 0o700 });
+  const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(member, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+    renameSync(temporaryPath, filePath);
+    chmodSync(filePath, 0o600);
+  } catch (error) {
+    rmSync(temporaryPath, { force: true });
+    throw error;
+  }
+};
 
-// 直接读取 Codex Home 文件，确保刚写入配置后无需重启即可完成本地校验。
-export const readCodexHomeMember = (env = process.env) => {
-  const envPath = resolveEnvPath(env);
-  return existsSync(envPath) ? readMemberFromEnvContent(readFileSync(envPath, 'utf8')) : null;
+export const readUserMember = (env = process.env) => {
+  const memberPath = resolveUserMemberPath(env);
+  if (existsSync(memberPath)) return normalizeMember(JSON.parse(readFileSync(memberPath, 'utf8')));
+  const legacyPath = resolveCodexEnvPath(env);
+  return existsSync(legacyPath) ? readMemberFromEnvContent(readFileSync(legacyPath, 'utf8')) : null;
 };
 
 const readMember = async () => {
@@ -69,9 +85,9 @@ const main = async () => {
     console.log('Usage: node configure-member.mjs < member.json');
     return;
   }
-  const envPath = resolveEnvPath();
-  writeCodexHomeMember(envPath, await readMember());
-  console.log(`成员配置已安全写入 ${envPath}`);
+  const memberPath = resolveUserMemberPath();
+  writeUserMember(memberPath, await readMember());
+  console.log(`成员配置已安全写入 ${memberPath}`);
 };
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {

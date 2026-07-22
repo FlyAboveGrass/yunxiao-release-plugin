@@ -4,6 +4,23 @@ set -euo pipefail
 
 readonly RAW_ROOT='https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main'
 
+# npm/GitHub npx 安装优先使用包内同版本脚本；curl 管道入口才回退到远端下载。
+resolve_installer() {
+  local installer="$1" temporary_dir="$2"
+  local source_path="${BASH_SOURCE[0]:-}"
+  if [[ -n "$source_path" && -f "$source_path" ]]; then
+    local repository_root
+    repository_root="$(cd "$(dirname "$source_path")" && pwd)"
+    if [[ -f "$repository_root/$installer" ]]; then
+      printf '%s\n' "$repository_root/$installer"
+      return
+    fi
+  fi
+  command -v curl >/dev/null || { echo '缺少命令：curl' >&2; return 1; }
+  curl -fsSL "$RAW_ROOT/$installer" -o "$temporary_dir/$installer"
+  printf '%s\n' "$temporary_dir/$installer"
+}
+
 render_agent_checkboxes() {
   local cursor="$1" codex_selected="$2" claude_selected="$3" redraw="$4"
   local codex_mark='◻' claude_mark='◻' codex_pointer=' ' claude_pointer=' '
@@ -60,16 +77,15 @@ choose_installers() {
 
 # 统一入口只负责选择宿主，具体安装和认证仍由已验证的宿主脚本处理。
 main() {
-  command -v curl >/dev/null || { echo '缺少命令：curl' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
-  local installers installer
+  local installers installer installer_path
   installers="$(choose_installers)"
   readonly TEMPORARY_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMPORARY_DIR"' EXIT
   while IFS= read -r installer; do
-    curl -fsSL "$RAW_ROOT/$installer" -o "$TEMPORARY_DIR/$installer"
-    bash "$TEMPORARY_DIR/$installer" </dev/tty
+    installer_path="$(resolve_installer "$installer" "$TEMPORARY_DIR")"
+    bash "$installer_path" </dev/tty
   done <<<"$installers"
 }
 

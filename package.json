@@ -1,0 +1,32 @@
+{
+  "name": "yunxiao-release",
+  "version": "0.5.0",
+  "description": "Codex 和 Claude Code 的云效单 MR 发版插件安装器。",
+  "type": "module",
+  "bin": {
+    "yunxiao-release": "bin/yunxiao-release.mjs"
+  },
+  "files": [
+    ".agents/",
+    ".claude-plugin/",
+    "bin/",
+    "plugins/",
+    "install.sh",
+    "install-codex.sh",
+    "install-claude.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FlyAboveGrass/yunxiao-release-plugin.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "license": "MIT"
+}

@@ -4,9 +4,9 @@
 
 | 类型 | 路径 | Git |
 |---|---|---|
-| 项目共享配置 | `.codex/yunxiao-release.json` | 提交 |
+| 项目共享配置 | `.agents/yunxiao-release.json` | 提交；Codex 与 Claude Code 共用 |
 | 项目成员配置 | `.agents/yunxiao-release.local.json` | 忽略；Codex 与 Claude Code 共用 |
-| 用户级成员配置 | `${CODEX_HOME:-$HOME/.codex}/.env` | 不在项目中；默认路径可由 Codex 与 Claude Code 共用 |
+| 用户级成员配置 | `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/member.json` | 不在项目中；Codex 与 Claude Code 共用 |
 | MR 运行状态 | `.agents/runtime/yunxiao-release-mr.json` | 忽略；Codex 与 Claude Code 共用 |
 | 评论处理文档 | `.agents/runtime/yunxiao-release-comments.md` | 忽略；Codex 与 Claude Code 共用 |
 
@@ -20,8 +20,8 @@
 ```
 
 - `displayName`、`userId` 均由成员交互输入；`userId` 必须与 `get_current_user` 返回值精确一致后才能写入。
-- 项目成员配置优先；缺失时读取用户级 `.env` 中的 `YUNXIAO_DISPLAY_NAME` 和 `YUNXIAO_USER_ID`。
-- 项目存储由 `localConfigFile` 指定项目内相对路径并必须被 Git 忽略；用户级存储沿用 Codex Home 兼容路径，对使用该路径的 Codex、Claude Code 项目和 worktree 生效；自定义 `CODEX_HOME` 时两个宿主必须使用同一值。
+- 项目成员配置优先；缺失时读取用户级成员 JSON。旧 Codex `.env` 中的 `YUNXIAO_DISPLAY_NAME` 和 `YUNXIAO_USER_ID` 仅作为迁移期兼容读取。
+- 项目存储由 `localConfigFile` 指定项目内相对路径并必须被 Git 忽略；用户级存储使用 XDG 配置路径，对 Codex、Claude Code 项目和 worktree 生效。
 - `tokenSource` 不再持久化，固定按 `environment` 处理；旧项目文件中的该字段兼容但忽略。
 - 切换 Token 或云效账号后必须重新验证身份并更新成员配置。
 

@@ -6,6 +6,19 @@ readonly CLAUDE_MARKETPLACE_SOURCE='FlyAboveGrass/yunxiao-release-plugin'
 readonly RAW_BASE='https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main/plugins/yunxiao-release/scripts'
 readonly MARKETPLACE='yunxiao-release-community'
 readonly PLUGIN='yunxiao-release'
+readonly CLAUDE_INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-}")" && pwd)"
+
+prepare_script() {
+  local script_name="$1" temporary_dir="$2"
+  local bundled_dir="$CLAUDE_INSTALL_ROOT/plugins/yunxiao-release/scripts"
+  if [[ -f "$bundled_dir/$script_name" ]]; then
+    printf '%s\n' "$bundled_dir/$script_name"
+    return
+  fi
+  command -v curl >/dev/null || { echo '缺少命令：curl' >&2; return 1; }
+  curl -fsSL "$RAW_BASE/$script_name" -o "$temporary_dir/$script_name"
+  printf '%s\n' "$temporary_dir/$script_name"
+}
 
 json_has_item() {
   local field="$1"
@@ -58,7 +71,7 @@ start_claude_configuration() {
 
 # 主流程复用现有项目配置脚本；Token 由 Claude Code 的敏感 userConfig 管理。
 main() {
-  for command in curl git node claude; do
+  for command in git node claude; do
     command -v "$command" >/dev/null || { echo "缺少命令：$command" >&2; exit 1; }
   done
   node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 20 ? 0 : 1)" || {
@@ -70,14 +83,15 @@ main() {
 
   readonly TEMP_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMP_DIR"' EXIT
-  curl -fsSL "$RAW_BASE/configure-project.mjs" -o "$TEMP_DIR/configure-project.mjs"
+  local project_script
+  project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
 
   configure_claude_marketplace
   configure_claude_plugin </dev/tty
 
   readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  (cd "$PROJECT_ROOT" && node "$TEMP_DIR/configure-project.mjs")
-  test -f "$PROJECT_ROOT/.codex/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
+  (cd "$PROJECT_ROOT" && node "$project_script")
+  test -f "$PROJECT_ROOT/.agents/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
   configure_claude_token "$PROJECT_ROOT" </dev/tty
   start_claude_configuration "$PROJECT_ROOT" </dev/tty

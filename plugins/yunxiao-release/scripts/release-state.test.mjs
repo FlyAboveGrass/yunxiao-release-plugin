@@ -18,7 +18,7 @@ const run = () => {
   const agentsDir = resolve(rootDir, '.agents');
   mkdirSync(codexDir, { recursive: true });
   mkdirSync(agentsDir, { recursive: true });
-  writeJson(resolve(codexDir, 'yunxiao-release.json'), {
+  writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
     organizationId: 'org-1',
     repositoryId: 'repo-1',
   });
@@ -41,21 +41,28 @@ const run = () => {
   assert.equal(checkConfig(rootDir).config.versionFile, 'package.json');
   assert.equal(checkConfig(rootDir).localConfig.userId, 'user-1');
   assert.equal(checkConfig(rootDir).memberConfigSource, 'project');
+  const xdgConfigHome = resolve(rootDir, 'xdg-config');
+  mkdirSync(resolve(xdgConfigHome, 'yunxiao-release'), { recursive: true });
+  writeJson(resolve(xdgConfigHome, 'yunxiao-release/member.json'), {
+    displayName: '用户级成员',
+    userId: 'user-member',
+  });
+  rmSync(resolve(agentsDir, 'yunxiao-release.local.json'));
+  const homeConfig = checkConfig(rootDir, { HOME: rootDir, XDG_CONFIG_HOME: xdgConfigHome });
+  assert.deepEqual(homeConfig.localConfig, { displayName: '用户级成员', userId: 'user-member' });
+  assert.equal(homeConfig.memberConfigSource, 'user');
+  rmSync(resolve(xdgConfigHome, 'yunxiao-release/member.json'));
   const codexHome = resolve(rootDir, 'codex-home');
   mkdirSync(codexHome);
-  writeFileSync(
-    resolve(codexHome, '.env'),
-    'YUNXIAO_DISPLAY_NAME="Home 成员"\nYUNXIAO_USER_ID="home-user"\n',
-  );
-  rmSync(resolve(agentsDir, 'yunxiao-release.local.json'));
-  const homeConfig = checkConfig(rootDir, { CODEX_HOME: codexHome });
-  assert.deepEqual(homeConfig.localConfig, { displayName: 'Home 成员', userId: 'home-user' });
-  assert.equal(homeConfig.memberConfigSource, 'codex-home');
+  writeFileSync(resolve(codexHome, '.env'), 'YUNXIAO_DISPLAY_NAME="旧成员"\nYUNXIAO_USER_ID="legacy-user"\n');
+  const legacyConfig = checkConfig(rootDir, { CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome });
+  assert.deepEqual(legacyConfig.localConfig, { displayName: '旧成员', userId: 'legacy-user' });
+  assert.equal(legacyConfig.memberConfigSource, 'legacy-codex-home');
   const emptyCodexHome = resolve(rootDir, 'empty-codex-home');
   mkdirSync(emptyCodexHome);
   writeFileSync(resolve(emptyCodexHome, '.env'), 'YUNXIAO_DISPLAY_NAME="不完整"\n');
   assert.throws(
-    () => checkConfig(rootDir, { CODEX_HOME: emptyCodexHome }),
+    () => checkConfig(rootDir, { CODEX_HOME: emptyCodexHome, XDG_CONFIG_HOME: xdgConfigHome }),
     /Codex Home 成员配置不完整/,
   );
   writeJson(resolve(agentsDir, 'yunxiao-release.local.json'), {
@@ -63,8 +70,8 @@ const run = () => {
     userId: 'user-1',
     tokenSource: 'legacy-value',
   });
-  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome }).memberConfigSource, 'project');
-  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome }).localConfig.userId, 'user-1');
+  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome }).memberConfigSource, 'project');
+  assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome }).localConfig.userId, 'user-1');
   upsertMr(rootDir, baseRecord);
   upsertMr(rootDir, { ...baseRecord, title: '更新标题' });
   upsertMr(rootDir, {
@@ -75,7 +82,7 @@ const run = () => {
     createdAt: '2026-07-16T02:00:00.000Z',
   });
   assert.equal(getCurrentMr(rootDir, 'feature/example').mrId, '11');
-  writeJson(resolve(codexDir, 'yunxiao-release.json'), {
+  writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
     organizationId: 'org-1',
     repositoryId: 'repo-1',
     runtimeFile: '../outside.json',

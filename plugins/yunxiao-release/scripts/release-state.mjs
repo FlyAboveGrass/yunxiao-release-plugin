@@ -4,9 +4,11 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFil
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { normalizeMember, readCodexHomeMember } from './configure-member.mjs';
+import { normalizeMember, readUserMember, resolveUserMemberPath } from './configure-member.mjs';
 
 const requiredConfigKeys = ['organizationId', 'repositoryId'];
+const projectConfigPath = '.agents/yunxiao-release.json';
+const legacyProjectConfigPath = '.codex/yunxiao-release.json';
 const configDefaults = {
   remoteName: 'origin',
   targetBranch: 'master',
@@ -63,11 +65,12 @@ const resolveProjectPath = (rootDir, configuredPath, label) => {
 
 // 兼容最小社区配置，并在读取时补齐不会改变云端状态的默认值。
 const getConfig = (rootDir) => {
-  const configPath = resolve(rootDir, '.codex/yunxiao-release.json');
-  if (!existsSync(configPath)) {
-    fail(`缺少项目共享配置: ${configPath}`);
-  }
-  const rawConfig = readJson(configPath);
+  const configPath = resolve(rootDir, projectConfigPath);
+  const legacyConfigPath = resolve(rootDir, legacyProjectConfigPath);
+  if (existsSync(configPath) && existsSync(legacyConfigPath)) fail('新旧项目共享配置同时存在，请确认保留哪一份');
+  const sourcePath = existsSync(configPath) ? configPath : legacyConfigPath;
+  if (!existsSync(sourcePath)) fail(`缺少项目共享配置: ${configPath}`);
+  const rawConfig = readJson(sourcePath);
   ensureKeys(rawConfig, requiredConfigKeys, '项目共享配置');
   const config = { ...configDefaults, ...rawConfig };
   if (!['ask', 'required', 'skip'].includes(config.reviewMode)) {
@@ -159,7 +162,7 @@ export const getCurrentMr = (rootDir, sourceBranch) => {
   return records.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
 };
 
-// 项目配置覆盖 Codex Home 配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
+// 项目配置覆盖用户级配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
 export const checkConfig = (rootDir, env = process.env) => {
   const config = getConfig(rootDir);
   const localConfigPath = resolveProjectPath(rootDir, config.localConfigFile, 'localConfigFile');
@@ -171,9 +174,10 @@ export const checkConfig = (rootDir, env = process.env) => {
       memberConfigSource: 'project',
     };
   }
-  const localConfig = readCodexHomeMember(env);
-  if (!localConfig) fail(`缺少成员配置: ${localConfigPath} 或 Codex Home .env`);
-  return { config, localConfig, memberConfigSource: 'codex-home' };
+  const localConfig = readUserMember(env);
+  if (!localConfig) fail(`缺少成员配置: ${localConfigPath} 或 ${resolveUserMemberPath(env)}`);
+  const memberConfigSource = existsSync(resolveUserMemberPath(env)) ? 'user' : 'legacy-codex-home';
+  return { config, localConfig, memberConfigSource };
 };
 
 const printHelp = () => {

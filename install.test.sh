@@ -8,6 +8,12 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
+resolved_installer="$(resolve_installer install-codex.sh "$TEST_DIR")"
+if [[ "$resolved_installer" != "$ROOT_DIR/install-codex.sh" ]]; then
+  echo '本地安装包必须复用包内同版本脚本' >&2
+  exit 1
+fi
+
 printf '\n' >"$TEST_DIR/checkbox-keys"
 if [[ "$(choose_installers "$TEST_DIR/checkbox-keys" 2>/dev/null)" != $'install-codex.sh\ninstall-claude.sh' ]]; then
   echo '复选框默认选中的宿主不符合预期' >&2
@@ -41,6 +47,11 @@ if [[ "$checkbox_status" -ne 130 ]]; then
 fi
 
 source "$ROOT_DIR/install-codex.sh"
+
+if [[ "$(prepare_script configure-project.mjs "$TEST_DIR")" != "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-project.mjs" ]]; then
+  echo 'Codex 安装必须优先复用包内配置脚本' >&2
+  exit 1
+fi
 
 MOCK_MODE='stale'
 
@@ -180,7 +191,7 @@ if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install-codex.sh"; then
   echo 'Token 必须使用隐藏输入模式读取' >&2
   exit 1
 fi
-if ! grep -Fq 'configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
+if ! grep -Fq 'configure_token "$token_script" </dev/tty' "$ROOT_DIR/install-codex.sh"; then
   echo 'curl 管道安装时 Token 必须从控制终端读取' >&2
   exit 1
 fi

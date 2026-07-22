@@ -10,6 +10,8 @@ const legacyPrivatePaths = {
   runtimeFile: '.codex/runtime/yunxiao-release-mr.json',
   commentsFile: '.codex/runtime/yunxiao-release-comments.md',
 };
+const projectConfigPath = '.agents/yunxiao-release.json';
+const legacyProjectConfigPath = '.codex/yunxiao-release.json';
 
 const defaultConfig = {
   organizationId: '',
@@ -46,22 +48,22 @@ const isIgnored = (rootDir, file) => {
   throw new Error(`无法检查 Git 忽略规则: ${result.stderr?.toString().trim() || 'git check-ignore 执行失败'}`);
 };
 
-// 普通项目只忽略两个本地目标；已有 .codex 整体规则时才补共享配置的最小放行规则。
+// 普通项目只忽略本地状态；已有 .agents 整体规则时才放行共享配置。
 const updateGitignore = (rootDir, config) => {
   const filePath = resolve(rootDir, '.gitignore');
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
   const currentLines = current.split(/\r?\n/);
   const privateRules = getPrivateRules(config);
-  const hasCodexWildcard = currentLines.includes('/.codex/*');
-  const rules = hasCodexWildcard || isIgnored(rootDir, '.codex/yunxiao-release.json')
-    ? ['!/.codex/', '/.codex/*', '!/.codex/yunxiao-release.json', ...privateRules.filter((rule) => !rule.startsWith('/.codex/'))]
+  const hasAgentsWildcard = currentLines.includes('/.agents/*');
+  const rules = hasAgentsWildcard || isIgnored(rootDir, projectConfigPath)
+    ? ['!/.agents/', '/.agents/*', `!/${projectConfigPath}`, ...privateRules.filter((rule) => !rule.startsWith('/.agents/'))]
     : privateRules;
   const generatedPrivateRules = new Set([
     ...getPrivateRules(defaultConfig),
     ...[config.localConfigFile, config.runtimeFile, config.commentsFile].map(toIgnoreRule),
   ]);
-  const retainedLines = hasCodexWildcard
-    ? currentLines.filter((rule) => !generatedPrivateRules.has(rule) || !rule.startsWith('/.codex/'))
+  const retainedLines = hasAgentsWildcard
+    ? currentLines.filter((rule) => !generatedPrivateRules.has(rule) || !rule.startsWith('/.agents/'))
     : currentLines;
   const missing = rules.filter((rule) => !retainedLines.includes(rule));
   const removedLegacyRules = retainedLines.length !== currentLines.length;
@@ -94,7 +96,7 @@ const validateProjectPaths = (rootDir, config) => {
   ['localConfigFile', 'runtimeFile', 'commentsFile', 'versionFile', 'announcementFile']
     .filter((key) => config[key] !== null)
     .forEach((key) => validateProjectPath(rootDir, config[key], key));
-  validateProjectPath(rootDir, '.codex/yunxiao-release.json', 'configFile');
+  validateProjectPath(rootDir, projectConfigPath, 'configFile');
   validateProjectPath(rootDir, '.gitignore', 'gitignoreFile');
 };
 
@@ -102,9 +104,8 @@ const validateProjectPaths = (rootDir, config) => {
 export const writeProjectConfig = (rootDir, config) => {
   if (!existsSync(resolve(rootDir, '.git'))) throw new Error(`当前目录不是 Git 仓库：${rootDir}`);
   validateProjectPaths(rootDir, config);
-  const codexDir = resolve(rootDir, '.codex');
-  const filePath = resolve(codexDir, 'yunxiao-release.json');
-  mkdirSync(codexDir, { recursive: true });
+  const filePath = resolve(rootDir, projectConfigPath);
+  mkdirSync(dirname(filePath), { recursive: true });
   updateGitignore(rootDir, config);
   const temporaryPath = `${filePath}.tmp`;
   try {
@@ -132,15 +133,25 @@ const getLegacyMigrations = (rootDir, existing, config) => {
 
 // 无参数生成可直接编辑的共享配置；已有配置只补默认字段，避免覆盖用户值。
 export const configureProject = (rootDir) => {
-  const configPath = resolve(rootDir, '.codex/yunxiao-release.json');
-  const existing = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : {};
+  const configPath = resolve(rootDir, projectConfigPath);
+  const legacyConfigPath = resolve(rootDir, legacyProjectConfigPath);
+  if (existsSync(configPath) && existsSync(legacyConfigPath)) {
+    throw new Error('新旧项目共享配置同时存在，请确认保留哪一份后重试');
+  }
+  const sourcePath = existsSync(configPath) ? configPath : legacyConfigPath;
+  const existing = existsSync(sourcePath) ? JSON.parse(readFileSync(sourcePath, 'utf8')) : {};
   const migrated = { ...existing };
   for (const [key, legacyPath] of Object.entries(legacyPrivatePaths)) {
     if (migrated[key] === legacyPath) migrated[key] = defaultConfig[key];
   }
   const config = buildConfig(migrated);
   const migrations = getLegacyMigrations(rootDir, existing, config);
-  if (migrations.length === 0) return writeProjectConfig(rootDir, config);
+  const writeConfig = () => {
+    const result = writeProjectConfig(rootDir, config);
+    if (sourcePath === legacyConfigPath && existsSync(legacyConfigPath)) rmSync(legacyConfigPath);
+    return result;
+  };
+  if (migrations.length === 0) return writeConfig();
 
   updateGitignore(rootDir, config);
   for (const { targetPath } of migrations) {
@@ -153,16 +164,17 @@ export const configureProject = (rootDir) => {
       renameSync(migration.sourcePath, migration.targetPath);
       moved.push(migration);
     }
-    return writeProjectConfig(rootDir, config);
+    return writeConfig();
   } catch (error) {
     for (const migration of moved.reverse()) renameSync(migration.targetPath, migration.sourcePath);
+    if (sourcePath === legacyConfigPath && existsSync(legacyConfigPath)) rmSync(configPath, { force: true });
     throw error;
   }
 };
 
 const main = () => {
   if (process.argv.includes('--help')) {
-    console.log('Usage: node configure-project.mjs\n\n在当前 Git 项目生成 .codex/yunxiao-release.json。');
+    console.log(`Usage: node configure-project.mjs\n\n在当前 Git 项目生成 ${projectConfigPath}。`);
     return;
   }
   if (process.argv.length > 2) throw new Error('configure-project 不接受参数；生成后请直接编辑配置文件');

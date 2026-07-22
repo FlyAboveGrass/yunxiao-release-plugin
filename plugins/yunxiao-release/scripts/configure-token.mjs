@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const tokenKey = 'YUNXIAO_ACCESS_TOKEN';
 
-export const resolveEnvPath = (env = process.env) =>
+export const resolveCodexEnvPath = (env = process.env) =>
   resolve(env.CODEX_HOME || resolve(env.HOME || env.USERPROFILE || homedir(), '.codex'), '.env');
 
 export const upsertToken = (content, token) => {
@@ -49,7 +49,7 @@ const readToken = async () => {
   });
 };
 
-// 原子更新 Codex Home .env，避免 Token 或成员配置写到一半时破坏现有环境。
+// 原子更新 Codex Home .env，避免 Token 写到一半时破坏现有环境。
 export const writeEnvFile = (filePath, updateContent) => {
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
   mkdirSync(dirname(filePath), { recursive: true });
@@ -67,7 +67,7 @@ export const writeEnvFile = (filePath, updateContent) => {
 export const writeToken = (filePath, token) => writeEnvFile(filePath, (content) => upsertToken(content, token));
 
 const main = async () => {
-  const envPath = resolveEnvPath();
+  const envPath = resolveCodexEnvPath();
   if (process.argv.includes('--check')) {
     const configured = existsSync(envPath) && hasConfiguredToken(readFileSync(envPath, 'utf8'));
     console.log(configured ? `${tokenKey} 已配置：${envPath}` : `${tokenKey} 未配置：${envPath}`);

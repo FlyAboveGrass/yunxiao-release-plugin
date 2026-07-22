@@ -12,6 +12,11 @@ node -e 'const fs=require("fs");const root=process.argv[1];const codex=JSON.pars
 
 source "$ROOT_DIR/install-claude.sh"
 
+if [[ "$(prepare_script configure-project.mjs "$TEST_DIR")" != "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-project.mjs" ]]; then
+  echo 'Claude Code 安装必须优先复用包内配置脚本' >&2
+  exit 1
+fi
+
 MOCK_MODE='missing'
 
 # 模拟 Claude CLI 的未安装和已安装状态，并记录公开安装命令。

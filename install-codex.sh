@@ -6,6 +6,19 @@ readonly REPOSITORY='https://github.com/FlyAboveGrass/yunxiao-release-plugin.git
 readonly RAW_BASE='https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main/plugins/yunxiao-release/scripts'
 readonly MARKETPLACE='yunxiao-release-community'
 readonly PLUGIN='yunxiao-release'
+readonly CODEX_INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-}")" && pwd)"
+
+prepare_script() {
+  local script_name="$1" temporary_dir="$2"
+  local bundled_dir="$CODEX_INSTALL_ROOT/plugins/yunxiao-release/scripts"
+  if [[ -f "$bundled_dir/$script_name" ]]; then
+    printf '%s\n' "$bundled_dir/$script_name"
+    return
+  fi
+  command -v curl >/dev/null || { echo '缺少命令：curl' >&2; return 1; }
+  curl -fsSL "$RAW_BASE/$script_name" -o "$temporary_dir/$script_name"
+  printf '%s\n' "$temporary_dir/$script_name"
+}
 
 # 已配置来源正常升级；仅在 CLI 明确报告失联缓存冲突时清理并重试。
 configure_marketplace() {
@@ -70,7 +83,7 @@ start_project_configuration() {
 
 # 主流程依次验证环境、配置 Token、安装插件并初始化当前 Git 项目。
 main() {
-  for command in curl git node codex; do
+  for command in git node codex; do
     command -v "$command" >/dev/null || { echo "缺少命令：$command" >&2; exit 1; }
   done
   node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 20 ? 0 : 1)" || {
@@ -83,17 +96,18 @@ main() {
 
   readonly TEMP_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMP_DIR"' EXIT
-  curl -fsSL "$RAW_BASE/configure-token.mjs" -o "$TEMP_DIR/configure-token.mjs"
-  curl -fsSL "$RAW_BASE/configure-project.mjs" -o "$TEMP_DIR/configure-project.mjs"
+  local token_script project_script
+  token_script="$(prepare_script configure-token.mjs "$TEMP_DIR")"
+  project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
 
-  configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty
+  configure_token "$token_script" </dev/tty
 
   configure_marketplace
   codex plugin add "$PLUGIN@$MARKETPLACE"
 
   readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  (cd "$PROJECT_ROOT" && node "$TEMP_DIR/configure-project.mjs")
-  test -f "$PROJECT_ROOT/.codex/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
+  (cd "$PROJECT_ROOT" && node "$project_script")
+  test -f "$PROJECT_ROOT/.agents/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
   start_project_configuration "$PROJECT_ROOT" </dev/tty
 }
