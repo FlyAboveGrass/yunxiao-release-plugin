@@ -25,7 +25,7 @@ json_has_item() {
   local expected="$2"
   local second_field="${3:-}"
   local second_expected="${4:-}"
-  node -e 'const data=JSON.parse(require("fs").readFileSync(0,"utf8"));const [field,expected,secondField,secondExpected]=process.argv.slice(1);process.exit(data.some(item=>item[field]===expected&&(!secondField||item[secondField]===secondExpected))?0:1)' "$field" "$expected" "$second_field" "$second_expected"
+  node -e 'const data=JSON.parse(require("fs").readFileSync(0,"utf8"));const [field,expected,secondField,secondExpected]=process.argv.slice(1);process.exit(data.some(item=>String(item[field])===expected&&(!secondField||String(item[secondField])===secondExpected))?0:1)' "$field" "$expected" "$second_field" "$second_expected"
 }
 
 configure_claude_marketplace() {
@@ -49,7 +49,9 @@ configure_claude_plugin() {
   plugins="$(claude plugin list --json)"
   if printf '%s' "$plugins" | json_has_item id "$plugin_id" scope user; then
     claude plugin update "$plugin_id" --scope user
-    claude plugin enable "$plugin_id" --scope user
+    if ! printf '%s' "$plugins" | json_has_item id "$plugin_id" enabled true; then
+      claude plugin enable "$plugin_id" --scope user
+    fi
   else
     claude plugin install "$plugin_id" --scope user
   fi

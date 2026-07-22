@@ -34,14 +34,22 @@ claude() {
       ;;
     'plugin list --json')
       if [[ "$MOCK_MODE" == 'installed' ]]; then
-        printf '[{"id":"%s@%s","scope":"user"}]\n' "$PLUGIN" "$MARKETPLACE"
+        printf '[{"id":"%s@%s","scope":"user","enabled":true}]\n' "$PLUGIN" "$MARKETPLACE"
+      elif [[ "$MOCK_MODE" == 'disabled' ]]; then
+        printf '[{"id":"%s@%s","scope":"user","enabled":false}]\n' "$PLUGIN" "$MARKETPLACE"
       elif [[ "$MOCK_MODE" == 'project' ]]; then
         printf '[{"id":"%s@%s","scope":"project"}]\n' "$PLUGIN" "$MARKETPLACE"
       else
         printf '[]\n'
       fi
       ;;
-    'plugin marketplace add FlyAboveGrass/yunxiao-release-plugin'|'plugin marketplace update yunxiao-release-community'|'plugin install yunxiao-release@yunxiao-release-community --scope user'|'plugin update yunxiao-release@yunxiao-release-community --scope user'|'plugin enable yunxiao-release@yunxiao-release-community --scope user'|'/plugin configure yunxiao-release@yunxiao-release-community'|'/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。')
+    'plugin enable yunxiao-release@yunxiao-release-community --scope user')
+      if [[ "$MOCK_MODE" == 'installed' ]]; then
+        echo 'Plugin is already enabled at user scope' >&2
+        return 1
+      fi
+      ;;
+    'plugin marketplace add FlyAboveGrass/yunxiao-release-plugin'|'plugin marketplace update yunxiao-release-community'|'plugin install yunxiao-release@yunxiao-release-community --scope user'|'plugin update yunxiao-release@yunxiao-release-community --scope user'|'/plugin configure yunxiao-release@yunxiao-release-community'|'/yunxiao-release:yunxiao-release-config 交互配置当前成员身份。')
       ;;
     *)
       echo "未预期的 Claude 调用: $*" >&2
@@ -62,9 +70,18 @@ fi
 MOCK_MODE='installed'
 configure_claude_marketplace
 configure_claude_plugin
-expected_calls=$'plugin marketplace list --json\nplugin marketplace update yunxiao-release-community\nplugin list --json\nplugin update yunxiao-release@yunxiao-release-community --scope user\nplugin enable yunxiao-release@yunxiao-release-community --scope user'
+expected_calls=$'plugin marketplace list --json\nplugin marketplace update yunxiao-release-community\nplugin list --json\nplugin update yunxiao-release@yunxiao-release-community --scope user'
 if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
   echo '重复安装的 Claude CLI 调用不符合预期' >&2
+  exit 1
+fi
+
+: >"$TEST_DIR/calls"
+MOCK_MODE='disabled'
+configure_claude_plugin
+expected_calls=$'plugin list --json\nplugin update yunxiao-release@yunxiao-release-community --scope user\nplugin enable yunxiao-release@yunxiao-release-community --scope user'
+if [[ "$(<"$TEST_DIR/calls")" != "$expected_calls" ]]; then
+  echo '已禁用插件更新后必须重新启用' >&2
   exit 1
 fi
 
