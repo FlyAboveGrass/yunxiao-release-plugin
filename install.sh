@@ -4,19 +4,58 @@ set -euo pipefail
 
 readonly RAW_ROOT='https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main'
 
-select_installer() {
-  case "$1" in
-    1|codex|Codex) printf 'install-codex.sh\n' ;;
-    2|claude|Claude|claude-code|'Claude Code') printf 'install-claude.sh\n' ;;
-    *) return 1 ;;
-  esac
+render_agent_checkboxes() {
+  local cursor="$1" codex_selected="$2" claude_selected="$3" redraw="$4"
+  local codex_mark='◻' claude_mark='◻' codex_pointer=' ' claude_pointer=' '
+  [[ "$codex_selected" -eq 1 ]] && codex_mark='◼'
+  [[ "$claude_selected" -eq 1 ]] && claude_mark='◼'
+  [[ "$cursor" -eq 0 ]] && codex_pointer='❯'
+  [[ "$cursor" -eq 1 ]] && claude_pointer='❯'
+  [[ "$redraw" -eq 1 ]] && printf '\033[4A' >&2
+  printf '\033[2K请选择要安装的 Agent：\n' >&2
+  printf '\033[2K%s %s Codex\n' "$codex_pointer" "$codex_mark" >&2
+  printf '\033[2K%s %s Claude Code\n' "$claude_pointer" "$claude_mark" >&2
+  printf '\033[2K↑↓ 移动，空格切换，回车确认，q 取消\n' >&2
 }
 
-choose_installer() {
-  local choice
-  printf '请选择使用的 Agent：\n  1) Codex\n  2) Claude Code\n请输入序号：' >&2
-  IFS= read -r choice </dev/tty
-  select_installer "$choice" || { echo '无效选择，请输入 1 或 2' >&2; return 1; }
+# 复选框默认选中两个已支持宿主，并允许一次安装一个或多个 Agent。
+choose_installers() {
+  local input_path="${1:-/dev/tty}"
+  local cursor=0 codex_selected=1 claude_selected=1 redraw=0 key sequence
+  exec 3<"$input_path"
+  while true; do
+    render_agent_checkboxes "$cursor" "$codex_selected" "$claude_selected" "$redraw"
+    IFS= read -r -s -n 1 key <&3 || { exec 3<&-; return 1; }
+    case "$key" in
+      '')
+        if [[ "$codex_selected" -eq 0 && "$claude_selected" -eq 0 ]]; then
+          printf '\a' >&2
+          redraw=1
+          continue
+        fi
+        break
+        ;;
+      ' ')
+        if [[ "$cursor" -eq 0 ]]; then codex_selected=$((1 - codex_selected)); else claude_selected=$((1 - claude_selected)); fi
+        ;;
+      q|Q)
+        printf '\n安装已取消。\n' >&2
+        exec 3<&-
+        return 130
+        ;;
+      $'\033')
+        IFS= read -r -s -n 2 sequence <&3 || true
+        [[ "$sequence" == '[A' ]] && cursor=$(((cursor + 1) % 2))
+        [[ "$sequence" == '[B' ]] && cursor=$(((cursor + 1) % 2))
+        ;;
+    esac
+    redraw=1
+  done
+  exec 3<&-
+  printf '\n' >&2
+  [[ "$codex_selected" -eq 1 ]] && printf 'install-codex.sh\n'
+  [[ "$claude_selected" -eq 1 ]] && printf 'install-claude.sh\n'
+  return 0
 }
 
 # 统一入口只负责选择宿主，具体安装和认证仍由已验证的宿主脚本处理。
@@ -24,12 +63,14 @@ main() {
   command -v curl >/dev/null || { echo '缺少命令：curl' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
-  local installer
-  installer="$(choose_installer)"
-  readonly TEMPORARY_FILE="$(mktemp)"
-  trap 'rm -f "$TEMPORARY_FILE"' EXIT
-  curl -fsSL "$RAW_ROOT/$installer" -o "$TEMPORARY_FILE"
-  bash "$TEMPORARY_FILE" </dev/tty
+  local installers installer
+  installers="$(choose_installers)"
+  readonly TEMPORARY_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TEMPORARY_DIR"' EXIT
+  while IFS= read -r installer; do
+    curl -fsSL "$RAW_ROOT/$installer" -o "$TEMPORARY_DIR/$installer"
+    bash "$TEMPORARY_DIR/$installer" </dev/tty
+  done <<<"$installers"
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

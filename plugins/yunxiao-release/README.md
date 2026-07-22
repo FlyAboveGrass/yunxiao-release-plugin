@@ -25,11 +25,13 @@
 
 前置条件：Git、Node.js 20+、支持 Plugins 的 Codex 或 Claude Code，以及可访问目标云效代码库的个人访问令牌。
 
-进入要使用插件的 Git 项目运行统一安装入口，再交互选择 Codex 或 Claude Code：
+进入要使用插件的 Git 项目运行统一安装入口，再通过复选框选择 Codex、Claude Code 或两者：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugin/main/install.sh | bash
 ```
+
+复选框默认勾选两个 Agent；使用方向键移动、空格切换、回车确认。只保留需要安装的 Agent 即可。
 
 选择 Codex 后，安装脚本会依次：
 

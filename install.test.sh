@@ -8,12 +8,35 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
-if [[ "$(select_installer codex)" != 'install-codex.sh' || "$(select_installer claude)" != 'install-claude.sh' ]]; then
-  echo '统一安装入口没有映射到正确宿主' >&2
+printf '\n' >"$TEST_DIR/checkbox-keys"
+if [[ "$(choose_installers "$TEST_DIR/checkbox-keys" 2>/dev/null)" != $'install-codex.sh\ninstall-claude.sh' ]]; then
+  echo '复选框默认选中的宿主不符合预期' >&2
   exit 1
 fi
-if select_installer unknown >/dev/null; then
-  echo '统一安装入口必须拒绝未知宿主' >&2
+
+printf ' \n' >"$TEST_DIR/checkbox-keys"
+if [[ "$(choose_installers "$TEST_DIR/checkbox-keys" 2>/dev/null)" != 'install-claude.sh' ]]; then
+  echo '复选框没有按空格切换当前宿主' >&2
+  exit 1
+fi
+
+printf '\033[B \n' >"$TEST_DIR/checkbox-keys"
+set +e
+checkbox_selection="$(choose_installers "$TEST_DIR/checkbox-keys" 2>/dev/null)"
+checkbox_status=$?
+set -e
+if [[ "$checkbox_status" -ne 0 || "$checkbox_selection" != 'install-codex.sh' ]]; then
+  echo '复选框没有按方向键移动当前项' >&2
+  exit 1
+fi
+
+printf 'q' >"$TEST_DIR/checkbox-keys"
+set +e
+choose_installers "$TEST_DIR/checkbox-keys" >/dev/null 2>&1
+checkbox_status=$?
+set -e
+if [[ "$checkbox_status" -ne 130 ]]; then
+  echo '复选框取消操作没有停止安装' >&2
   exit 1
 fi
 

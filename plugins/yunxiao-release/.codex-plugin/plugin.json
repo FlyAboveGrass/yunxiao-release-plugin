@@ -1,6 +1,6 @@
 {
   "name": "yunxiao-release",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "通过阿里云云效官方 MCP 组织任意 Git 项目的单 MR 开发、评审与发版准备流程。",
   "author": {
     "name": "FlyAboveGrass"
