@@ -14,7 +14,7 @@
 
 ```json
 {
-  "displayName": "成员输入的本地显示名称",
+  "displayName": "成员输入的用户名称（真实名字）",
   "userId": "成员输入并经云效官方 MCP 核对的当前用户 ID"
 }
 ```

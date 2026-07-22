@@ -8,6 +8,11 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
+if ! grep -Fq '用户名称（真实名字）：' "$ROOT_DIR/plugins/yunxiao-release/skills/yunxiao-release-config/SKILL.md"; then
+  echo '成员配置必须明确提示用户名称（真实名字）' >&2
+  exit 1
+fi
+
 if grep -Eq 'codex -C|claude "/plugin configure|claude "\$prompt"' \
   "$ROOT_DIR/install.sh" "$ROOT_DIR/install-codex.sh" "$ROOT_DIR/install-claude.sh"; then
   echo '安装脚本不得自动启动 Codex 或 Claude Code 交互配置' >&2
