@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +29,21 @@ const run = () => {
   assert.equal(projectConfig.reviewerMode, 'ask');
   assert.deepEqual(projectConfig.reviewerUserIds, []);
 
+  const missingTokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_HOME: codexHome },
+  });
+  assert.equal(missingTokenResult.status, 1);
+
+  const invalidEnvPath = resolve(codexHome, '.env');
+  mkdirSync(invalidEnvPath, { recursive: true });
+  const failedTokenCheckResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_HOME: codexHome },
+  });
+  assert.equal(failedTokenCheckResult.status, 2);
+  rmSync(invalidEnvPath, { recursive: true });
+
   const tokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs')], {
     input: 'test-token',
     encoding: 'utf8',
@@ -36,6 +51,11 @@ const run = () => {
   });
   assert.equal(tokenResult.status, 0, tokenResult.stderr);
   assert.equal(readFileSync(resolve(codexHome, '.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
+  const existingTokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_HOME: codexHome },
+  });
+  assert.equal(existingTokenResult.status, 0, existingTokenResult.stderr);
 
   const memberResult = spawnSync('node', [resolve(aliasDir, 'configure-member.mjs')], {
     input: JSON.stringify({ displayName: '测试成员', userId: 'user-1' }),

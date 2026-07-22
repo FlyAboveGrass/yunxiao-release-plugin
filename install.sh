@@ -33,6 +33,41 @@ configure_marketplace() {
   codex plugin marketplace add "$REPOSITORY" --ref main
 }
 
+# 检测 Codex Home 中已有的云效 Token；仅在缺失时通过终端隐藏输入。
+configure_token() {
+  local token_script="$1"
+  local check_output
+  local check_status=0
+  check_output="$(node "$token_script" --check 2>&1)" || check_status=$?
+  if [[ "$check_status" -eq 0 ]]; then
+    echo '检测到 YUNXIAO_ACCESS_TOKEN 已存在，跳过输入。'
+    return
+  fi
+  if [[ "$check_status" -ne 1 ]]; then
+    if [[ -n "$check_output" ]]; then
+      printf '%s\n' "$check_output" >&2
+    else
+      echo '检查 YUNXIAO_ACCESS_TOKEN 时发生错误' >&2
+    fi
+    return "$check_status"
+  fi
+
+  local access_token
+  printf '请输入 YUNXIAO_ACCESS_TOKEN（输入不可见）：' >&2
+  IFS= read -r -s access_token
+  printf '\n' >&2
+  [[ -n "$access_token" ]] || { echo 'Token 不能为空' >&2; exit 1; }
+  printf '%s' "$access_token" | node "$token_script"
+}
+
+# 新进程会重新加载刚安装的插件和 Codex Home 环境，并保留后续交互能力。
+start_project_configuration() {
+  local project_root="$1"
+  local prompt='$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。'
+  echo '插件安装完成，正在启动云效交互配置……'
+  codex -C "$project_root" "$prompt"
+}
+
 # 主流程依次验证环境、配置 Token、安装插件并初始化当前 Git 项目。
 main() {
   for command in curl git node codex; do
@@ -51,13 +86,7 @@ main() {
   curl -fsSL "$RAW_BASE/configure-token.mjs" -o "$TEMP_DIR/configure-token.mjs"
   curl -fsSL "$RAW_BASE/configure-project.mjs" -o "$TEMP_DIR/configure-project.mjs"
 
-  printf '请输入 YUNXIAO_ACCESS_TOKEN（输入不可见）：' >/dev/tty
-  IFS= read -r -s YUNXIAO_ACCESS_TOKEN </dev/tty
-  printf '\n' >/dev/tty
-  [[ -n "$YUNXIAO_ACCESS_TOKEN" ]] || { echo 'Token 不能为空' >&2; exit 1; }
-  printf '%s' "$YUNXIAO_ACCESS_TOKEN" | node "$TEMP_DIR/configure-token.mjs"
-  unset YUNXIAO_ACCESS_TOKEN
-  test -s "${CODEX_HOME:-$HOME/.codex}/.env" || { echo 'Token 配置失败' >&2; exit 1; }
+  configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty
 
   configure_marketplace
   codex plugin add "$PLUGIN@$MARKETPLACE"
@@ -66,7 +95,7 @@ main() {
   (cd "$PROJECT_ROOT" && node "$TEMP_DIR/configure-project.mjs")
   test -f "$PROJECT_ROOT/.codex/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
 
-  echo "安装完成。请编辑 $PROJECT_ROOT/.codex/yunxiao-release.json，然后重启 Codex 并新建会话。"
+  start_project_configuration "$PROJECT_ROOT" </dev/tty
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

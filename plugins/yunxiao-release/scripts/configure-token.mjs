@@ -81,6 +81,7 @@ const main = async () => {
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    // --check 用 1 表示未配置，实际读取错误必须使用不同状态，避免安装器误触发重新输入。
+    process.exitCode = process.argv.includes('--check') ? 2 : 1;
   });
 }

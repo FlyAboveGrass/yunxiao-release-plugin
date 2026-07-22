@@ -40,6 +40,9 @@ codex() {
     'plugin marketplace remove yunxiao-release-community')
       printf 'Removed marketplace.\n'
       ;;
+    -C\ *)
+      [[ "$MOCK_MODE" == 'launch' ]] || { echo "未预期的 Codex 调用: $*" >&2; return 1; }
+      ;;
     *)
       echo "未预期的 Codex 调用: $*" >&2
       return 1
@@ -102,10 +105,70 @@ if [[ "$actual_calls" != 'plugin marketplace list' ]]; then
   exit 1
 fi
 
+export CODEX_HOME="$TEST_DIR/codex-home"
+mkdir -p "$CODEX_HOME"
+printf 'YUNXIAO_ACCESS_TOKEN=existing-token\n' >"$CODEX_HOME/.env"
+token_output="$(configure_token "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-token.mjs")"
+if [[ "$token_output" != '检测到 YUNXIAO_ACCESS_TOKEN 已存在，跳过输入。' ]]; then
+  echo '已配置 Token 时必须跳过重复输入' >&2
+  exit 1
+fi
+
+node() {
+  echo 'simulated token check failure' >&2
+  return 2
+}
+if configure_token ignored 2>"$TEST_DIR/token-check-error"; then
+  echo 'Token 检查异常时必须停止安装' >&2
+  exit 1
+else
+  check_status=$?
+fi
+unset -f node
+if [[ "$check_status" -ne 2 || "$(<"$TEST_DIR/token-check-error")" != 'simulated token check failure' ]]; then
+  echo 'Token 检查异常没有保留状态和错误信息' >&2
+  exit 1
+fi
+
+rm -rf "$CODEX_HOME"
+mkdir -p "$CODEX_HOME"
+# 标准输入模拟首次写入并验证输出不含 Token；终端隐藏参数和 /dev/tty 重定向另行锁定。
+token_output="$(configure_token "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-token.mjs" <<<'first-secret-token' 2>&1)"
+if [[ "$token_output" == *'first-secret-token'* ]]; then
+  echo 'Token 输入不应回显到终端' >&2
+  exit 1
+fi
+if [[ "$(<"$CODEX_HOME/.env")" != 'YUNXIAO_ACCESS_TOKEN=first-secret-token' ]]; then
+  echo '首次输入的 Token 没有正确写入 Codex Home' >&2
+  exit 1
+fi
+if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install.sh"; then
+  echo 'Token 必须使用隐藏输入模式读取' >&2
+  exit 1
+fi
+if ! grep -Fq 'configure_token "$TEMP_DIR/configure-token.mjs" </dev/tty' "$ROOT_DIR/install.sh"; then
+  echo 'curl 管道安装时 Token 必须从控制终端读取' >&2
+  exit 1
+fi
+
+: >"$TEST_DIR/calls"
+MOCK_MODE='launch'
+start_project_configuration "$TEST_DIR/project" >"$TEST_DIR/configuration-output"
+expected_calls="-C $TEST_DIR/project \$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。"
+actual_calls="$(<"$TEST_DIR/calls")"
+if [[ "$actual_calls" != "$expected_calls" ]]; then
+  printf '交互配置启动参数不符合预期：\n%s\n' "$actual_calls" >&2
+  exit 1
+fi
+if ! grep -Fq 'start_project_configuration "$PROJECT_ROOT" </dev/tty' "$ROOT_DIR/install.sh"; then
+  echo '新 Codex 交互配置必须继承控制终端' >&2
+  exit 1
+fi
+
 piped_output="$(sed 's/^  main "$@"$/  printf "piped main invoked\\n"/' "$ROOT_DIR/install.sh" | bash)"
 if [[ "$piped_output" != 'piped main invoked' ]]; then
   echo '通过 curl 管道执行时必须进入主流程' >&2
   exit 1
 fi
 
-printf 'install marketplace tests passed\n'
+printf 'install tests passed\n'

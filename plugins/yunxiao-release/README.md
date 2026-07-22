@@ -33,12 +33,13 @@ curl -fsSL https://raw.githubusercontent.com/FlyAboveGrass/yunxiao-release-plugi
 
 安装脚本会依次：
 
-1. 交互式隐藏读取 `YUNXIAO_ACCESS_TOKEN`。
-2. 将 Token 写入 `${CODEX_HOME:-$HOME/.codex}/.env`，保留其他变量并设置权限为 `600`。
+1. 检查 `${CODEX_HOME:-$HOME/.codex}/.env` 中是否已有 `YUNXIAO_ACCESS_TOKEN`；已有时直接复用，缺失时才交互式隐藏读取。
+2. 首次输入时将 Token 写入 Codex Home `.env`，保留其他变量并设置权限为 `600`。
 3. 从 GitHub 添加 marketplace 并安装插件。
 4. 在当前 Git 项目生成 `.codex/yunxiao-release.json` 和必要的 `.gitignore` 规则。
+5. 启动新的 Codex 交互式会话，并自动发送 `$yunxiao-release:yunxiao-release-config 交互配置当前成员身份。`。
 
-脚本不会打印 Token，也不会将 Token 放入命令参数或 shell 历史。完成后编辑生成的配置文件，再重启 Codex 并新建会话。
+脚本不会打印 Token，也不会将 Token 放入命令参数或 shell 历史。这里检测和保存的是云效 `YUNXIAO_ACCESS_TOKEN`，与 Apifox Token 无关。交互配置完成并退出 Codex 后，安装脚本结束。
 
 普通项目默认只向 `.gitignore` 追加两条规则：
 
