@@ -15,12 +15,14 @@
 ```json
 {
   "displayName": "成员输入的用户名称（真实名字）",
-  "userId": "成员输入并经云效官方 MCP 核对的当前用户 ID"
+  "userId": "成员输入并经云效官方 MCP 核对的当前用户 ID",
+  "feishuId": "可选；自动环境发布使用的飞书用户 ID"
 }
 ```
 
 - `displayName`、`userId` 均由成员交互输入；`userId` 必须与 `get_current_user` 返回值精确一致后才能写入。
-- 项目成员配置优先；缺失时读取用户级成员 JSON。旧 Codex `.env` 中的 `YUNXIAO_DISPLAY_NAME` 和 `YUNXIAO_USER_ID` 仅作为迁移期兼容读取。
+- `feishuId` 可选，不参与云效身份认证，禁止写入项目共享配置或日志。
+- 身份字段以项目成员配置优先；项目文件缺失时读取用户级成员 JSON。`feishuId` 单独按“项目值优先、缺失则回退用户值”解析。旧 Codex `.env` 中的 `YUNXIAO_DISPLAY_NAME` 和 `YUNXIAO_USER_ID` 仅作为迁移期兼容读取。
 - 项目存储由 `localConfigFile` 指定项目内相对路径并必须被 Git 忽略；用户级存储使用 XDG 配置路径，对 Codex、Claude Code 项目和 worktree 生效。
 - `tokenSource` 不再持久化，固定按 `environment` 处理；旧项目文件中的该字段兼容但忽略。
 - 切换 Token 或云效账号后必须重新验证身份并更新成员配置。
@@ -44,6 +46,35 @@
 | `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 项目内共享 MR 状态路径，必须被 Git 忽略 |
 | `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | 项目内共享评论记录路径，必须被 Git 忽略 |
 | `validationCommands` | `["git diff --check"]` | 项目规则和 CI 的最低验证命令，必须是非空数组；执行前逐条展示并确认 |
+| `testDeployments` | `[]` | 项目环境发布配置；自动测试发布或生产环境人工发布入口 |
+
+## 环境发布
+
+`testDeployments` 中的 `environment` 必填且唯一，配置支持两种模式：
+
+```json
+[
+  {
+    "environment": "fat",
+    "targetBranch": "develop",
+    "hookUrl": "https://example.com/webhook",
+    "webUrl": "https://example.com/pipeline"
+  },
+  {
+    "environment": "production",
+    "webUrl": "https://example.com/production-pipeline"
+  }
+]
+```
+
+- 自动发布：`targetBranch` 和 `hookUrl` 必须同时配置，`webUrl` 可选。远端 release 分支复用共享配置的 `targetBranch`。
+- 手动发布：省略 `targetBranch` 和 `hookUrl`，必须配置 `webUrl`；只返回人工发布入口，不执行 Git 或 webhook。
+- 所有 URL 只允许 HTTP(S)。每次只发布一个环境，不根据 `fat`、`uat`、`production` 等名称猜测模式。
+- 自动发布的 webhook 请求固定为 `POST application/json`。`feishuId` 已配置时请求体是 `{ "feishuId": "...", "branch": "<targetBranch>" }`，未配置时仅发送 `{ "branch": "<targetBranch>" }`，不阻断发布。
+
+`feishuId` 是可选成员字段，与 `displayName`、`userId` 存放在同一个用户级或项目级成员 JSON 中。项目 `localConfigFile` 中存在该值时优先，否则读取用户级 `member.json`；未配置不报错。身份配置更新必须保留已有 `feishuId`，日志和最终输出不得显示该值。
+
+自动发布必须先以 `--dry-run` 预检并一次确认全部副作用。执行时要求干净工作区，把远端 release 普通合入当前分支，再从远端测试分支创建临时 detached worktree，普通合入当前 HEAD，非强制推送并验证远端提交后触发 webhook。成功或失败均强制清理 worktree；清理失败必须报告残留路径。Webhook 失败不回滚已经推送的测试分支。
 
 `reviewMode` 的行为：
 
@@ -94,7 +125,7 @@ ready_to_finalize -> finalizing -> ready_for_manual_merge
 任意阶段 -> blocked
 ```
 
-当前插件不提供 `merging`、`merged` 或远端发版能力。
+MR 运行状态不记录环境发布过程；环境发布由独立 Skill 即时执行，不改变上述 MR 状态机。
 
 ## 确认门禁
 

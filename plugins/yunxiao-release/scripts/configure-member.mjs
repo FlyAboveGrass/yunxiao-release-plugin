@@ -13,10 +13,16 @@ const memberKeys = {
   userId: 'YUNXIAO_USER_ID',
 };
 
-export const normalizeMember = ({ displayName, userId }) => {
+// 身份字段保持必填；feishuId 是环境发布的可选用户设置。
+export const normalizeMember = ({ displayName, userId, feishuId }) => {
   const member = { displayName: displayName?.trim(), userId: userId?.trim() };
   for (const [key, value] of Object.entries(member)) {
     if (!value || /[\r\n\0]/.test(value)) throw new Error(`${key} 不能为空或包含换行符`);
+  }
+  if (feishuId !== undefined && feishuId !== null && String(feishuId).trim()) {
+    const normalizedFeishuId = String(feishuId).trim();
+    if (/[\r\n\0]/.test(normalizedFeishuId)) throw new Error('feishuId 不能包含换行符');
+    member.feishuId = normalizedFeishuId;
   }
   return member;
 };
@@ -53,7 +59,8 @@ export const resolveUserMemberPath = (env = process.env) => {
 
 // 用户身份写入宿主无关的 XDG 路径；旧 Codex Home 只作为读取兼容层。
 export const writeUserMember = (filePath, rawMember) => {
-  const member = normalizeMember(rawMember);
+  const existing = existsSync(filePath) ? JSON.parse(readFileSync(filePath, 'utf8')) : {};
+  const member = normalizeMember({ ...existing, ...rawMember });
   mkdirSync(dirname(filePath), { recursive: true, mode: 0o700 });
   const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
   try {

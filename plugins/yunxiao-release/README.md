@@ -6,6 +6,7 @@
 
 - 支持任意云效组织、代码库、Git remote 和目标分支。
 - 创建或恢复当前分支的单个 MR，可选处理 Review 评论、版本文件和发版公告。
+- 按项目配置发布测试分支并触发构建，或提供生产环境人工发布入口。
 - 不合并 MR，也不绕过审批、流水线、冲突或保护分支。
 
 ## 安装
@@ -64,7 +65,19 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
   "localConfigFile": ".agents/yunxiao-release.local.json",
   "runtimeFile": ".agents/runtime/yunxiao-release-mr.json",
   "commentsFile": ".agents/runtime/yunxiao-release-comments.md",
-  "validationCommands": ["git diff --check"]
+  "validationCommands": ["git diff --check"],
+  "testDeployments": [
+    {
+      "environment": "fat",
+      "targetBranch": "develop",
+      "hookUrl": "https://example.com/webhook",
+      "webUrl": "https://example.com/pipeline"
+    },
+    {
+      "environment": "production",
+      "webUrl": "https://example.com/production-pipeline"
+    }
+  ]
 }
 ```
 
@@ -83,6 +96,7 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 | `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 当前分支和 MR 的运行状态，必须是项目内相对路径并被 Git 忽略。 |
 | `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | MR 评论处理记录，必须是项目内相对路径并被 Git 忽略。 |
 | `validationCommands` | `["git diff --check"]` | 创建 MR 和收尾前执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；每条命令执行前都会展示并确认。 |
+| `testDeployments` | `[]` | 环境发布配置。`targetBranch + hookUrl` 表示自动测试发布；仅 `environment + webUrl` 表示生产环境人工发布入口。 |
 
 ## 成员身份与 Token
 
@@ -98,12 +112,14 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 ```json
 {
   "displayName": "张三",
-  "userId": "云效 MCP 返回的当前用户 ID"
+  "userId": "云效 MCP 返回的当前用户 ID",
+  "feishuId": "可选的飞书用户 ID"
 }
 ```
 
 - `displayName` 是用户真实名字，不参与认证。
 - `userId` 必须与当前 Token 对应的云效用户 ID 一致，不能使用组织 ID、邮箱或用户名代替。
+- `feishuId` 是可选字段，只用于自动环境发布；与 `displayName`、`userId` 存放在同一个成员配置文件，可放在用户级配置，也可由项目级配置覆盖。未配置时 webhook 仅发送目标分支，不阻断发布。
 
 项目级配置必须被 Git 忽略，可运行以下命令确认：
 
@@ -139,6 +155,7 @@ npx github:FlyAboveGrass/yunxiao-release-plugin token --check
 | 同步评论 | `$yunxiao-release:yunxiao-release-comments` | `/yunxiao-release:yunxiao-release-comments` | 同步当前 MR 的评论和处理状态。 |
 | 处理评论 | `$yunxiao-release:yunxiao-release-review-fix` | `/yunxiao-release:yunxiao-release-review-fix` | 分析并处理未解决评论。 |
 | 发版收尾 | `$yunxiao-release:yunxiao-release-finalize` | `/yunxiao-release:yunxiao-release-finalize` | 按配置更新版本文件和发版公告，验证并推送到同一个 MR，等待有权限成员合并。 |
+| 环境发布 | `$yunxiao-release:yunxiao-release-test-deploy` | `/yunxiao-release:yunxiao-release-test-deploy` | 自动发布一个测试环境，或返回生产环境人工发布入口。 |
 
 ## 常见问题
 

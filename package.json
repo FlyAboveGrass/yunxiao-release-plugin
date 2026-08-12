@@ -1,7 +1,7 @@
 {
   "name": "yunxiao-release",
   "version": "0.5.3",
-  "description": "Codex 和 Claude Code 的云效单 MR 发版插件安装器。",
+  "description": "Codex 和 Claude Code 的云效单 MR 与环境发布插件安装器。",
   "type": "module",
   "bin": {
     "yunxiao-release": "bin/yunxiao-release.mjs"

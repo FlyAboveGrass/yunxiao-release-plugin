@@ -27,6 +27,7 @@ const defaultConfig = {
   runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
   commentsFile: '.agents/runtime/yunxiao-release-comments.md',
   validationCommands: ['git diff --check'],
+  testDeployments: [],
 };
 
 export const buildConfig = (existing = {}) => ({ ...defaultConfig, ...existing });

@@ -14,15 +14,15 @@ description: 初始化、更新或检查任意 Git 项目的云效发版配置�
 3. 确认当前会话真实存在云效官方 MCP 工具，并读取其 Schema。
 4. 缺少 `organizationId` 时调用 `get_current_organization_info` 获取当前组织 ID，并调用 `get_user_organizations` 将该 ID 映射为组织名称；用户要切换组织时也从组织列表展示候选。展示组织名称和 ID，经用户确认后才能写入共享配置。
 5. 缺少 `repositoryId` 时读取配置 remote 的 URL，只提取仓库名作为 `list_repositories` 的搜索词；展示返回的仓库名称、路径、Web URL 和数字 ID，经用户确认后调用 `get_repository` 核对，并把返回值的 `String(id)` 作为十进制字符串写入。没有唯一确认时停止，不得从 remote URL 推导 ID。
-6. 展示共享配置，说明每个字段的含义、默认行为和来源，确认 remote、目标分支、Review 模式、评审人模式、评审人白名单、可选发版文件、内部文件路径和验证命令；目标分支未配置时使用 `master`。
+6. 展示共享配置，说明每个字段的含义、默认行为和来源，确认 remote、目标分支、Review 模式、评审人模式、评审人白名单、可选发版文件、内部文件路径、验证命令和 `testDeployments`；目标分支未配置时使用 `master`。发布环境及 URL 必须由用户提供，不得猜测。
 7. 检查项目成员配置和用户级 `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/member.json`；项目配置存在时优先使用。旧 Codex `.env` 成员字段仅作为迁移期兼容读取。
-8. 初始化或更新成员配置时，交互询问存储范围（`项目` 或 `用户级`），并固定使用 `用户名称（真实名字）：`、`用户 ID：` 两个字段标签，不要求输入 `tokenSource`。
+8. 初始化或更新成员配置时，交互询问存储范围（`项目` 或 `用户级`），并在同一次交互中使用 `用户名称（真实名字）：`、`用户 ID：`、`飞书 ID（可选）：` 三个字段标签；`feishuId` 留空时不写入，不要求输入 `tokenSource`。
 9. 调用当前用户、组织、仓库和目标分支的只读工具验证认证与配置；用户输入的 ID 必须与 `get_current_user` 返回的 `userId` 精确一致，不一致时停止且不写入。
 10. 检查 `reviewerMode` 只使用 `ask|fixed`，`reviewerUserIds` 只包含非空且不重复的字符串；`fixed` 至少需要一个 ID。
 11. 对每个评审人 ID 调用 `get_organization_member_info_by_user_id`，核对返回的 `userId`、组织和启用状态。用户只提供名称时，可用 `search_organization_members` 查找并让用户确认，禁止按名称猜 ID。
-12. 选择项目存储时，将 `displayName`、`userId` 写入 `localConfigFile` 并用 `git check-ignore` 验证；选择用户级存储时，通过 stdin 把 `{displayName, userId}` JSON 交给 `scripts/configure-member.mjs`，由脚本原子写入权限为 `600` 的用户配置 JSON，禁止把用户输入拼入 shell 命令。如果项目成员配置已存在，说明它会覆盖用户级配置，经用户确认后删除项目文件。
+12. 选择项目存储时，将 `displayName`、`userId` 和可选 `feishuId` 一起写入 `localConfigFile` 并用 `git check-ignore` 验证；选择用户级存储时，通过 stdin 把同一个成员 JSON 交给 `scripts/configure-member.mjs`，由脚本原子写入权限为 `600` 的用户配置 JSON，禁止把用户输入拼入 shell 命令。如果项目成员配置已存在，说明它会覆盖用户级身份配置，经用户确认后删除项目文件。
 13. `tokenSource` 固定视为 `environment`，不写入新配置；旧项目文件存在该字段时忽略。
-14. 输出配置来源、用户名称（真实名字）、MCP 用户、组织、仓库、remote、目标分支、Review 模式、评审人模式、已验证评审人、可选发版文件及权限验证结果。
+14. 输出配置来源、用户名称（真实名字）、MCP 用户、是否已配置可选飞书 ID、组织、仓库、remote、目标分支、Review 模式、评审人模式、已验证评审人、环境发布配置、可选发版文件及权限验证结果；不得回显 `feishuId` 原值。
 
 ## 安全规则
 

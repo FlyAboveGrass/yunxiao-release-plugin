@@ -19,6 +19,7 @@ const configDefaults = {
   runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
   commentsFile: '.agents/runtime/yunxiao-release-comments.md',
   validationCommands: ['git diff --check'],
+  testDeployments: [],
 };
 const requiredRecordKeys = [
   'mrId',
@@ -63,8 +64,51 @@ const resolveProjectPath = (rootDir, configuredPath, label) => {
   return filePath;
 };
 
+const normalizeHttpUrl = (value, label) => {
+  if (typeof value !== 'string' || !value.trim()) fail(`${label} 必须是非空 HTTP(S) URL`);
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    fail(`${label} 必须是有效 HTTP(S) URL`);
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) fail(`${label} 只允许 HTTP(S) URL`);
+  return url.toString();
+};
+
+// 自动环境必须同时提供目标分支和 webhook；手动环境只提供可点击的发布入口。
+const normalizeTestDeployments = (deployments) => {
+  if (!Array.isArray(deployments)) fail('testDeployments 必须是数组');
+  const environments = new Set();
+  return deployments.map((deployment, index) => {
+    if (!deployment || typeof deployment !== 'object' || Array.isArray(deployment)) {
+      fail(`testDeployments[${index}] 必须是对象`);
+    }
+    const environment = typeof deployment.environment === 'string' ? deployment.environment.trim() : '';
+    if (!environment || /[\r\n\0]/.test(environment)) fail(`testDeployments[${index}].environment 无效`);
+    if (environments.has(environment)) fail(`testDeployments environment 重复: ${environment}`);
+    environments.add(environment);
+    const hasTargetBranch = deployment.targetBranch !== undefined && deployment.targetBranch !== null;
+    const hasHookUrl = deployment.hookUrl !== undefined && deployment.hookUrl !== null;
+    if (hasTargetBranch !== hasHookUrl) fail(`${environment} 的 targetBranch 和 hookUrl 必须同时配置`);
+    const webUrl = deployment.webUrl === undefined || deployment.webUrl === null
+      ? undefined
+      : normalizeHttpUrl(deployment.webUrl, `${environment}.webUrl`);
+    if (!hasTargetBranch && !webUrl) fail(`${environment} 手动发布环境必须配置 webUrl`);
+    if (!hasTargetBranch) return { environment, webUrl };
+    const targetBranch = typeof deployment.targetBranch === 'string' ? deployment.targetBranch.trim() : '';
+    if (!targetBranch || /[\r\n\0]/.test(targetBranch)) fail(`${environment}.targetBranch 无效`);
+    return {
+      environment,
+      targetBranch,
+      hookUrl: normalizeHttpUrl(deployment.hookUrl, `${environment}.hookUrl`),
+      ...(webUrl ? { webUrl } : {}),
+    };
+  });
+};
+
 // 兼容最小社区配置，并在读取时补齐不会改变云端状态的默认值。
-const getConfig = (rootDir) => {
+export const readProjectConfig = (rootDir) => {
   const configPath = resolve(rootDir, projectConfigPath);
   const legacyConfigPath = resolve(rootDir, legacyProjectConfigPath);
   if (existsSync(configPath) && existsSync(legacyConfigPath)) fail('新旧项目共享配置同时存在，请确认保留哪一份');
@@ -82,7 +126,7 @@ const getConfig = (rootDir) => {
   ['localConfigFile', 'runtimeFile', 'commentsFile', 'versionFile', 'announcementFile']
     .filter((key) => config[key] !== null)
     .forEach((key) => resolveProjectPath(rootDir, config[key], key));
-  return config;
+  return { ...config, testDeployments: normalizeTestDeployments(config.testDeployments) };
 };
 
 const writeJsonAtomic = (filePath, value) => {
@@ -129,7 +173,7 @@ const normalizeRecord = (record) => {
 
 // 同一 MR 按 mrId 原位更新，其他 MR 按创建时间排序，保证重复执行不会追加重复记录。
 export const upsertMr = (rootDir, rawRecord) => {
-  const config = getConfig(rootDir);
+  const config = readProjectConfig(rootDir);
   const record = normalizeRecord(rawRecord);
   if (record.targetBranch !== config.targetBranch) {
     fail(`MR 目标分支必须是 ${config.targetBranch}，当前为 ${record.targetBranch}`);
@@ -153,7 +197,7 @@ export const upsertMr = (rootDir, rawRecord) => {
 };
 
 export const getCurrentMr = (rootDir, sourceBranch) => {
-  const config = getConfig(rootDir);
+  const config = readProjectConfig(rootDir);
   const { state } = getState(rootDir, config);
   const records = state.branches[sourceBranch] ?? [];
   if (records.length === 0) {
@@ -164,7 +208,7 @@ export const getCurrentMr = (rootDir, sourceBranch) => {
 
 // 项目配置覆盖用户级配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
 export const checkConfig = (rootDir, env = process.env) => {
-  const config = getConfig(rootDir);
+  const config = readProjectConfig(rootDir);
   const localConfigPath = resolveProjectPath(rootDir, config.localConfigFile, 'localConfigFile');
   if (existsSync(localConfigPath)) {
     const localConfig = normalizeMember(readJson(localConfigPath));

@@ -25,6 +25,7 @@ const run = () => {
   assert.equal(config.remoteName, 'origin');
   assert.equal(config.reviewerMode, 'ask');
   assert.deepEqual(config.reviewerUserIds, []);
+  assert.deepEqual(config.testDeployments, []);
   assert.equal(config.versionFile, 'package.json');
   assert.equal(buildConfig({ versionFile: null }).versionFile, null);
   assert.equal(buildConfig({ targetBranch: 'main', versionFile: 'VERSION' }).targetBranch, 'main');
@@ -162,8 +163,13 @@ const run = () => {
   assert.deepEqual(readUserMember(userEnv), member);
   assert.equal(statSync(resolve(rootDir, 'xdg-config/yunxiao-release')).mode & 0o777, 0o700);
   assert.equal(statSync(memberPath).mode & 0o777, 0o600);
+  writeUserMember(memberPath, { ...member, feishuId: 'feishu-global' });
+  writeUserMember(memberPath, { ...member, displayName: '更新成员' });
+  assert.equal(JSON.parse(readFileSync(memberPath, 'utf8')).feishuId, 'feishu-global');
   const updatedMember = { displayName: '李四', userId: 'user-2' };
   writeUserMember(memberPath, updatedMember);
+  assert.deepEqual(JSON.parse(readFileSync(memberPath, 'utf8')), { ...updatedMember, feishuId: 'feishu-global' });
+  writeUserMember(memberPath, { ...updatedMember, feishuId: '' });
   assert.deepEqual(JSON.parse(readFileSync(memberPath, 'utf8')), updatedMember);
   assert.throws(() => writeUserMember(memberPath, { ...member, displayName: '坏\n名称' }), /包含换行符/);
   assert.deepEqual(readMemberFromEnvContent('YUNXIAO_DISPLAY_NAME="旧成员"\nYUNXIAO_USER_ID="legacy-user"\n'), {

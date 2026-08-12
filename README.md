@@ -1,6 +1,6 @@
 # Yunxiao Release Plugin
 
-通过阿里云云效官方 MCP，为 Codex 和 Claude Code 提供单 MR 发版流程：创建或恢复 MR、处理 Review 评论，并在合并前更新版本号和发版公告。插件不负责合并 MR。
+通过阿里云云效官方 MCP，为 Codex 和 Claude Code 提供单 MR 发版流程，并支持发布测试分支或打开生产环境人工发布入口。插件不负责合并 MR。
 
 ## 安装
 

@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { checkConfig, getCurrentMr, upsertMr } from './release-state.mjs';
+import { checkConfig, getCurrentMr, readProjectConfig, upsertMr } from './release-state.mjs';
 
 const writeJson = (filePath, value) => {
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
@@ -39,6 +39,7 @@ const run = () => {
   };
   assert.equal(checkConfig(rootDir).config.targetBranch, 'master');
   assert.equal(checkConfig(rootDir).config.versionFile, 'package.json');
+  assert.deepEqual(checkConfig(rootDir).config.testDeployments, []);
   assert.equal(checkConfig(rootDir).localConfig.userId, 'user-1');
   assert.equal(checkConfig(rootDir).memberConfigSource, 'project');
   const xdgConfigHome = resolve(rootDir, 'xdg-config');
@@ -72,6 +73,26 @@ const run = () => {
   });
   assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome }).memberConfigSource, 'project');
   assert.equal(checkConfig(rootDir, { CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome }).localConfig.userId, 'user-1');
+  writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
+    organizationId: 'org-1',
+    repositoryId: 'repo-1',
+    testDeployments: [
+      { environment: 'fat', targetBranch: 'develop', hookUrl: 'https://example.com/hook' },
+      { environment: 'production', webUrl: 'https://example.com/pipeline' },
+    ],
+  });
+  assert.equal(readProjectConfig(rootDir).testDeployments[0].targetBranch, 'develop');
+  assert.equal(readProjectConfig(rootDir).testDeployments[1].webUrl, 'https://example.com/pipeline');
+  writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
+    organizationId: 'org-1',
+    repositoryId: 'repo-1',
+    testDeployments: [{ environment: 'broken', targetBranch: 'develop' }],
+  });
+  assert.throws(() => readProjectConfig(rootDir), /targetBranch 和 hookUrl 必须同时配置/);
+  writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
+    organizationId: 'org-1',
+    repositoryId: 'repo-1',
+  });
   upsertMr(rootDir, baseRecord);
   upsertMr(rootDir, { ...baseRecord, title: '更新标题' });
   upsertMr(rootDir, {
