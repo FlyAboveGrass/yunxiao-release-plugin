@@ -53,6 +53,15 @@ const run = () => {
   assert.equal(spawnSync('git', ['check-ignore', '.agents/runtime/state.json'], { cwd: simpleRoot }).status, 0);
   assert.equal(spawnSync('git', ['check-ignore', '.codex/other.json'], { cwd: simpleRoot }).status, 1);
   assert.equal(existsSync(resolve(simpleRoot, '.codex')), false);
+  writeFileSync(
+    resolve(simpleRoot, '.gitignore'),
+    '/.agents/yunxiao-release.local.json\n/.agents/runtime/\n/.agents/yunxiao-release.local.json\n/.agents/runtime/\n',
+  );
+  configureProject(simpleRoot);
+  assert.equal(
+    readFileSync(resolve(simpleRoot, '.gitignore'), 'utf8'),
+    '/.agents/yunxiao-release.local.json\n/.agents/runtime/\n',
+  );
 
   const ignoredAgentsRoot = mkdtempSync(resolve(tmpdir(), 'yunxiao-release-agents-ignore-'));
   execFileSync('git', ['init'], { cwd: ignoredAgentsRoot, stdio: 'ignore' });

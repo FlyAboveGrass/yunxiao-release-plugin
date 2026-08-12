@@ -49,7 +49,7 @@ const isIgnored = (rootDir, file) => {
   throw new Error(`无法检查 Git 忽略规则: ${result.stderr?.toString().trim() || 'git check-ignore 执行失败'}`);
 };
 
-// 普通项目只忽略本地状态；已有 .agents 整体规则时才放行共享配置。
+// 普通项目只忽略本地状态；已有 .agents 整体规则时才放行共享配置，并归一化插件管理的规则。
 const updateGitignore = (rootDir, config) => {
   const filePath = resolve(rootDir, '.gitignore');
   const current = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
@@ -63,12 +63,14 @@ const updateGitignore = (rootDir, config) => {
     ...getPrivateRules(defaultConfig),
     ...[config.localConfigFile, config.runtimeFile, config.commentsFile].map(toIgnoreRule),
   ]);
-  const retainedLines = hasAgentsWildcard
-    ? currentLines.filter((rule) => !generatedPrivateRules.has(rule) || !rule.startsWith('/.agents/'))
-    : currentLines;
+  const managedRules = new Set([...rules, ...generatedPrivateRules]);
+  const retainedLines = currentLines.filter((rule, index) => {
+    if (hasAgentsWildcard && generatedPrivateRules.has(rule) && rule.startsWith('/.agents/')) return false;
+    return !managedRules.has(rule) || currentLines.indexOf(rule) === index;
+  });
   const missing = rules.filter((rule) => !retainedLines.includes(rule));
-  const removedLegacyRules = retainedLines.length !== currentLines.length;
-  if (!missing.length && !removedLegacyRules) return;
+  const removedRules = retainedLines.length !== currentLines.length;
+  if (!missing.length && !removedRules) return;
   const prefix = retainedLines.join('\n').trimEnd();
   const next = `${prefix ? `${prefix}\n` : ''}${missing.join('\n')}${missing.length ? '\n' : ''}`;
   writeFileSync(filePath, next);
