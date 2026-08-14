@@ -1,11 +1,11 @@
 ---
-name: yunxiao-release-mr
-description: 为任意已配置 Git 项目执行发版准备、项目验证、创建或恢复云效 MR，并保存分支对应的 MR 状态。用户说创建 MR、发起合并请求、发版准备或恢复 MR 时使用。
+name: yunxiao-release-02-prepare-mr
+description: 为已完成配置的 Git 项目同步目标分支、执行项目验证、创建或恢复云效 MR，并保存分支对应的 MR 状态。用户说创建 MR、发起合并请求或恢复 MR 时使用。
 ---
 
-# 云效发版 MR
+# 云效 MR 创建或恢复
 
-先读取 [发版契约](../../references/release-contract.md) 和 [MCP 能力矩阵](../../references/mcp-capability-matrix.md)。配置或认证未通过时改用 `yunxiao-release-config` Skill。
+先读取 [发版契约](../../references/release-contract.md) 和 [MCP 能力矩阵](../../references/mcp-capability-matrix.md)。配置或认证未通过时停止，并说明缺失或不一致的配置项。
 
 ## 流程
 
@@ -17,10 +17,10 @@ description: 为任意已配置 Git 项目执行发版准备、项目验证、�
 6. 查询当前仓库已有 MR，并按源分支精确匹配。找到记录时恢复到运行状态，不重复创建，跳过仅适用于新 MR 的评审人选择和创建步骤，直接进入步骤 12 的 `reviewMode` 分流。
 7. 没有 MR 时汇总提交与差异，准备标题、描述和 `ask|required|skip` Review 模式。
 8. 解析评审人配置。`reviewerMode` 缺失时按 `ask`，`reviewerUserIds` 缺失时按空数组；模式只允许 `ask|fixed`，ID 必须是非空且不重复的字符串。对每个配置 ID 调用 `get_organization_member_info_by_user_id`，要求返回的 `userId` 精确一致、组织一致，且状态为 `ENABLED`、`NORMAL_USING` 或 `UNVISITED`；无法证明时停止。
-9. `reviewerMode=ask` 且候选非空时，展示已验证的名称和用户 ID，让用户选择一个、多个、`全部` 或 `不指定`；`全部` 仅表示配置中的全部候选，最终集合必须是已验证白名单的子集。用户临时输入白名单外 ID 时停止并转 `yunxiao-release-config` Skill，不得直接用于创建 MR。候选为空时保持兼容，不指定评审人。`reviewerMode=fixed` 时必须配置至少一个 ID，并自动选择全部候选。
+9. `reviewerMode=ask` 且候选非空时，展示已验证的名称和用户 ID，让用户选择一个、多个、`全部` 或 `不指定`；`全部` 仅表示配置中的全部候选，最终集合必须是已验证白名单的子集。用户临时输入白名单外 ID 时停止并要求先验证、更新白名单，不得直接用于创建 MR。候选为空时保持兼容，不指定评审人。`reviewerMode=fixed` 时必须配置至少一个 ID，并自动选择全部候选。
 10. 展示 MR 参数、Review 模式和最终评审人并获得明确确认后，调用真实 `create_change_request`；选中评审人时传 `reviewerUserIds`，未选中时省略该参数。
 11. 创建成功后立即使用本 Skill 所属插件根目录的 `scripts/release-state.mjs upsert` 保存 MR ID、链接、分支、创建者、时间和 Review 模式；写入失败时停止，禁止查找仓库同名脚本或改写到其他路径。
-12. 对创建或恢复的 MR 重新查询并核对实际评审人。根据 `reviewMode` 输出下一步：`ask` 询问进入评论同步或直接收尾，`required` 必须进入评论同步，`skip` 直接提示单 MR 发版收尾。
+12. 对创建或恢复的 MR 重新查询并核对实际评审人，同时输出 `reviewMode` 及其对当前 MR 的 Review 要求。
 
 ## 约束
 

@@ -8,10 +8,32 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 source "$ROOT_DIR/install.sh"
 
-if ! grep -Fq '用户名称（真实名字）：' "$ROOT_DIR/plugins/yunxiao-release/skills/yunxiao-release-config/SKILL.md"; then
+if ! grep -Fq '用户名称（真实名字）：' "$ROOT_DIR/plugins/yunxiao-release/skills/yunxiao-release-01-configure/SKILL.md"; then
   echo '成员配置必须明确提示用户名称（真实名字）' >&2
   exit 1
 fi
+
+# 发版步骤 Skill 使用编号稳定排序；可随时调用的环境发布 Skill 不使用编号。
+readonly EXPECTED_SKILLS=(
+  yunxiao-release-01-configure
+  yunxiao-release-02-prepare-mr
+  yunxiao-release-03-sync-comments
+  yunxiao-release-04-fix-review-comments
+  yunxiao-release-05-finalize
+  yunxiao-release-deploy-environment
+)
+actual_skill_count="$(find "$ROOT_DIR/plugins/yunxiao-release/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+if [[ "$actual_skill_count" -ne "${#EXPECTED_SKILLS[@]}" ]]; then
+  echo "Skill 数量与阶段清单不一致: $actual_skill_count" >&2
+  exit 1
+fi
+for skill_name in "${EXPECTED_SKILLS[@]}"; do
+  skill_file="$ROOT_DIR/plugins/yunxiao-release/skills/$skill_name/SKILL.md"
+  if [[ ! -f "$skill_file" ]] || ! grep -Fqx "name: $skill_name" "$skill_file"; then
+    echo "Skill 阶段名称或目录不匹配: $skill_name" >&2
+    exit 1
+  fi
+done
 
 if grep -Eq 'codex -C|claude "/plugin configure|claude "\$prompt"' \
   "$ROOT_DIR/install.sh" "$ROOT_DIR/install-codex.sh" "$ROOT_DIR/install-claude.sh"; then

@@ -1,6 +1,6 @@
 # Yunxiao Release Plugin
 
-通过阿里云云效官方 MCP，把 Git 项目从开发分支推进到单个 MR 的发版收尾阶段，支持 Codex 和 Claude Code。源码和下载地址：<https://github.com/FlyAboveGrass/yunxiao-release-plugin>。
+通过阿里云云效官方 MCP，把 Git 项目从开发分支推进到单个 MR 的合并前准备阶段，支持 Codex 和 Claude Code。源码和下载地址：<https://github.com/FlyAboveGrass/yunxiao-release-plugin>。
 
 ## 能力边界
 
@@ -33,10 +33,10 @@ npx github:FlyAboveGrass/yunxiao-release-plugin
 
 ```text
 # Codex
-$yunxiao-release:yunxiao-release-config 交互配置当前项目和成员身份。
+$yunxiao-release:yunxiao-release-01-configure 交互配置当前项目和成员身份。
 
 # Claude Code
-/yunxiao-release:yunxiao-release-config 交互配置当前项目和成员身份。
+/yunxiao-release:yunxiao-release-01-configure 交互配置当前项目和成员身份。
 ```
 
 如果需要在其他 Git 项目中初始化共享配置，进入项目根目录运行：
@@ -87,15 +87,15 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 | `repositoryId` | 无，必填 | 云效代码库数字 ID 的字符串形式。推荐由配置 Skill 根据当前 remote 查询并确认。 |
 | `remoteName` | `origin` | 推送和同步使用的 Git remote。可通过 `git remote -v` 确认。 |
 | `targetBranch` | `master` | MR 的目标分支。应按项目分支策略配置。 |
-| `reviewMode` | `ask` | Review 流程模式：`ask` 在创建或恢复 MR 后及收尾前询问；`required` 要求收尾前同步并处理评论；`skip` 跳过评论流程。该配置不改变云效审批规则。 |
+| `reviewMode` | `ask` | Review 流程模式：`ask` 在创建或恢复 MR 后及合并前准备时询问；`required` 要求合并前完整同步并处理评论；`skip` 跳过评论流程。该配置不改变云效审批规则。 |
 | `reviewerMode` | `ask` | 评审人选择模式：`ask` 从白名单中选择一个、多个、全部或不指定，白名单为空时不指定；`fixed` 使用白名单中的全部成员，白名单为空时报错。 |
 | `reviewerUserIds` | `[]` | 评审人用户 ID 白名单。配置 Skill 可按成员名称查询并写入；代码库权限需由项目维护者确认。 |
-| `versionFile` | `package.json` | 收尾时更新的版本文件。没有统一版本文件时设为 `null`。 |
-| `announcementFile` | `null` | 收尾时更新的发版公告。`null` 表示跳过。 |
+| `versionFile` | `package.json` | 合并前按配置更新的版本文件。没有统一版本文件时设为 `null`。 |
+| `announcementFile` | `null` | 合并前按配置更新的发版公告。`null` 表示跳过。 |
 | `localConfigFile` | `.agents/yunxiao-release.local.json` | 项目级成员身份配置，必须是项目内相对路径并被 Git 忽略。 |
 | `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 当前分支和 MR 的运行状态，必须是项目内相对路径并被 Git 忽略。 |
 | `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | MR 评论处理记录，必须是项目内相对路径并被 Git 忽略。 |
-| `validationCommands` | `["git diff --check"]` | 创建 MR 和收尾前执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；每条命令执行前都会展示并确认。 |
+| `validationCommands` | `["git diff --check"]` | 创建 MR 和合并前准备阶段执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；每条命令执行前都会展示并确认。 |
 | `testDeployments` | `[]` | 环境发布配置。`targetBranch + hookUrl` 表示自动测试发布；仅 `environment + webUrl` 表示生产环境人工发布入口。 |
 
 ## 成员身份与 Token
@@ -149,13 +149,16 @@ npx github:FlyAboveGrass/yunxiao-release-plugin token --check
 
 ## 使用
 
-| 操作 | Codex | Claude Code | 说明 |
-|---|---|---|---|
-| 创建或恢复 MR | `$yunxiao-release:yunxiao-release-mr` | `/yunxiao-release:yunxiao-release-mr` | 验证当前分支、同步目标分支并创建或恢复 MR。需要合并目标分支时会先展示差异并确认。 |
-| 同步评论 | `$yunxiao-release:yunxiao-release-comments` | `/yunxiao-release:yunxiao-release-comments` | 同步当前 MR 的评论和处理状态。 |
-| 处理评论 | `$yunxiao-release:yunxiao-release-review-fix` | `/yunxiao-release:yunxiao-release-review-fix` | 分析并处理未解决评论。 |
-| 发版收尾 | `$yunxiao-release:yunxiao-release-finalize` | `/yunxiao-release:yunxiao-release-finalize` | 按配置更新版本文件和发版公告，验证并推送到同一个 MR，等待有权限成员合并。 |
-| 环境发布 | `$yunxiao-release:yunxiao-release-test-deploy` | `/yunxiao-release:yunxiao-release-test-deploy` | 自动发布一个测试环境，或返回生产环境人工发布入口。 |
+发版步骤 Skill 使用 `01–05` 编号辅助排序和识别；环境发布可随时独立调用，不使用编号。编号不表示 Skill 之间存在调用依赖或自动流转。
+
+| 编号 | 操作 | Codex | Claude Code | 用途 |
+|---|---|---|---|---|
+| 01 | 配置项目 | `$yunxiao-release:yunxiao-release-01-configure` | `/yunxiao-release:yunxiao-release-01-configure` | 初始化或检查项目配置、成员身份、MCP 认证和评审人。 |
+| 02 | 云效 MR 创建或恢复 | `$yunxiao-release:yunxiao-release-02-prepare-mr` | `/yunxiao-release:yunxiao-release-02-prepare-mr` | 验证当前分支并创建或恢复 MR。 |
+| 03 | 同步评论 | `$yunxiao-release:yunxiao-release-03-sync-comments` | `/yunxiao-release:yunxiao-release-03-sync-comments` | 完整同步当前 MR 的全局评论、行内评论和回复。 |
+| 04 | 处理评论 | `$yunxiao-release:yunxiao-release-04-fix-review-comments` | `/yunxiao-release:yunxiao-release-04-fix-review-comments` | 分析并处理当前 MR 的未解决评论。 |
+| 05 | 云效 MR 合并前准备 | `$yunxiao-release:yunxiao-release-05-finalize` | `/yunxiao-release:yunxiao-release-05-finalize` | 按配置更新版本号、发版资料，验证并在必要时推送到同一 MR，等待人工合并。 |
+| — | 环境发布 | `$yunxiao-release:yunxiao-release-deploy-environment` | `/yunxiao-release:yunxiao-release-deploy-environment` | 发布一个测试环境，或返回生产环境人工发布入口。 |
 
 ## 常见问题
 

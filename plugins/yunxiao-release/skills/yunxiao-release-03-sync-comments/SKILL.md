@@ -1,9 +1,9 @@
 ---
-name: yunxiao-release-comments
+name: yunxiao-release-03-sync-comments
 description: 可选地同步当前云效 MR 的全局评论、行内评论和回复，并生成可重复更新的临时评论文档。用户要求同步 MR 评论、查看 Review 意见或刷新评论状态时使用。
 ---
 
-# 云效 MR 评论同步
+# 同步云效 MR 评论
 
 先阅读 [发版契约](../../references/release-contract.md) 和 [MCP 能力矩阵](../../references/mcp-capability-matrix.md)。未要求 Review 时不要自动运行。
 
@@ -16,6 +16,7 @@ description: 可选地同步当前云效 MR 的全局评论、行内评论和回
 5. 按评论唯一 ID 合并回复关系和状态，重复执行时更新原条目，不重复追加。
 6. 写入共享配置的 `commentsFile`，保留 MR、同步时间、文件、行号、原文、作者、状态和讨论 ID。
 7. 将 Agent 分析、计划修改、实际修改和验证结果保留为可更新字段。
+8. 输出评论同步完整性、未解决评论数量和阻塞项摘要。
 
 ## 输出分区
 

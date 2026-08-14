@@ -1,0 +1,4 @@
+interface:
+  display_name: "01 · 云效发版配置"
+  short_description: "初始化或核验项目配置、成员身份、MCP 认证和评审人白名单"
+  default_prompt: "使用 $yunxiao-release-01-configure 初始化或检查当前项目的云效发版配置、成员身份和评审人。"

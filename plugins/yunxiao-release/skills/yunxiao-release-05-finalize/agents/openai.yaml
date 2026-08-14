@@ -1,0 +1,4 @@
+interface:
+  display_name: "05 · 云效 MR 合并前准备"
+  short_description: "检查 Review 门禁，按配置更新版本号、发版资料并完成最终验证和必要推送"
+  default_prompt: "使用 $yunxiao-release-05-finalize 检查 Review 门禁，并完成当前 MR 的合并前准备。"

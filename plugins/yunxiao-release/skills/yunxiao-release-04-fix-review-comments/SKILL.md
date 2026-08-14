@@ -1,11 +1,11 @@
 ---
-name: yunxiao-release-review-fix
+name: yunxiao-release-04-fix-review-comments
 description: 基于临时评论文档分析云效 MR 的未解决评论，完成经确认的最小代码修复、验证和评论状态回写。用户要求处理 Review 意见、修复 MR 评论或回复评审时使用。
 ---
 
-# 云效评审修复
+# 修复云效评审评论
 
-先阅读 [发版契约](../../references/release-contract.md)。评论文档不存在或已过期时先运行 `yunxiao-release-comments` Skill。
+先阅读 [发版契约](../../references/release-contract.md)。评论文档不存在、已过期或无法证明完整时停止，不得基于不完整评论修改代码。
 
 ## 流程
 
@@ -15,7 +15,7 @@ description: 基于临时评论文档分析云效 MR 的未解决评论，完成
 4. 获得用户确认后修改业务代码，并按适用的 `AGENTS.md`、`CLAUDE.md` 使用相应项目 Skill 和验证命令。
 5. 在评论文档记录分析、实际修改和验证证据。
 6. 获得单独确认后提交、推送；提交必须遵循项目规则和 Conventional Commits，项目存在提交 Skill 时优先使用。
-7. 重新运行 `yunxiao-release-comments` Skill，按评论 ID 识别新增、更新和已解决评论。
+7. 重新同步评论，按评论 ID 识别新增、更新和已解决评论。
 8. 回复或解决评论前再次确认，并仅调用真实 MCP 评论工具。
 
 ## 停止条件

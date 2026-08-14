@@ -1,0 +1,4 @@
+interface:
+  display_name: "03 · 云效 MR 评论同步"
+  short_description: "完整同步 MR 全局、行内评论与回复，检查完整性并更新处理文档"
+  default_prompt: "使用 $yunxiao-release-03-sync-comments 完整同步当前 MR 的全局评论、行内评论和回复。"

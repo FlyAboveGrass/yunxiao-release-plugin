@@ -1,0 +1,4 @@
+interface:
+  display_name: "02 · 云效 MR 创建与恢复"
+  short_description: "验证分支与项目规则，创建或恢复 MR 并保存当前分支运行状态"
+  default_prompt: "使用 $yunxiao-release-02-prepare-mr 验证当前分支并创建或恢复云效 MR。"

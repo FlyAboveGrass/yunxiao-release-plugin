@@ -1,5 +1,5 @@
 ---
-name: yunxiao-release-test-deploy
+name: yunxiao-release-deploy-environment
 description: 按项目配置将当前分支发布到 develop、uat 等测试环境，或返回生产环境人工发布入口。用户要求发布测试环境、部署 FAT/UAT、推送测试分支、触发构建 webhook、发布线上或打开生产发布页面时使用。
 ---
 

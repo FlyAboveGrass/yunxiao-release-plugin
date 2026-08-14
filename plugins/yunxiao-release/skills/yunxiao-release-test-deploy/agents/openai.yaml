@@ -1,4 +1,0 @@
-interface:
-  display_name: "云效环境发布"
-  short_description: "将当前代码发布到测试分支，或打开生产环境人工发布入口"
-  default_prompt: "使用 $yunxiao-release-test-deploy 发布当前项目到指定环境。"

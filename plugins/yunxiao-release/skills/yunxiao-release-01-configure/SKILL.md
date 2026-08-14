@@ -1,5 +1,5 @@
 ---
-name: yunxiao-release-config
+name: yunxiao-release-01-configure
 description: 初始化、更新或检查任意 Git 项目的云效发版配置、成员身份和 MR 评审人。用户提到初始化云效、配置 Token、检查 MCP 认证、切换成员、目标分支、评审人或发版配置缺失时使用。
 ---
 
