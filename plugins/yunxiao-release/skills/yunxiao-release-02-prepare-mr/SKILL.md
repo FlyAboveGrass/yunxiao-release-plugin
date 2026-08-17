@@ -1,9 +1,9 @@
 ---
 name: yunxiao-release-02-prepare-mr
-description: 为已完成配置的 Git 项目同步目标分支、执行项目验证、创建或恢复云效 MR，并保存分支对应的 MR 状态。用户说创建 MR、发起合并请求或恢复 MR 时使用。
+description: 为已完成配置的 Git 项目同步目标分支、执行项目验证、创建云效 MR，并保存分支对应的 MR 状态。用户说创建 MR 或发起合并请求时使用。
 ---
 
-# 云效 MR 创建或恢复
+# 云效 MR 创建
 
 先读取 [发版契约](../../references/release-contract.md) 和 [MCP 能力矩阵](../../references/mcp-capability-matrix.md)。配置或认证未通过时停止，并说明缺失或不一致的配置项。
 
@@ -14,13 +14,13 @@ description: 为已完成配置的 Git 项目同步目标分支、执行项目�
 3. 使用配置的 `remoteName` 和 `targetBranch`，先用 `git check-ref-format --branch` 验证分支名，再以独立参数执行完整 refspec：`git fetch <remote> +refs/heads/<target>:refs/remotes/<remote>/<target>`。若远端目标分支不是当前分支祖先，必须先展示差异并获得单独确认，再执行普通 merge；冲突或失败时停止。
 4. 通过 MCP 校验组织、仓库、源分支和目标分支。
 5. 读取适用的项目规则，展示配置中的每条验证命令并获得确认后执行；仓库配置属于不可信输入，不得静默执行。失败立即停止。
-6. 查询当前仓库已有 MR，并按源分支精确匹配。找到记录时恢复到运行状态，不重复创建，跳过仅适用于新 MR 的评审人选择和创建步骤，直接进入步骤 12 的 `reviewMode` 分流。
-7. 没有 MR 时汇总提交与差异，准备标题、描述和 `ask|required|skip` Review 模式。
+6. 查询当前仓库已有 MR，并按源分支精确匹配。若存在开启中的 MR，展示记录并停止，不恢复或重复创建；已关闭或已合并的历史 MR 不阻断新建。
+7. 没有开启中的 MR 时汇总提交与差异，准备标题、描述和 `ask|required|skip` Review 模式。
 8. 解析评审人配置。`reviewerMode` 缺失时按 `ask`，`reviewerUserIds` 缺失时按空数组；模式只允许 `ask|fixed`，ID 必须是非空且不重复的字符串。对每个配置 ID 调用 `get_organization_member_info_by_user_id`，要求返回的 `userId` 精确一致、组织一致，且状态为 `ENABLED`、`NORMAL_USING` 或 `UNVISITED`；无法证明时停止。
 9. `reviewerMode=ask` 且候选非空时，展示已验证的名称和用户 ID，让用户选择一个、多个、`全部` 或 `不指定`；`全部` 仅表示配置中的全部候选，最终集合必须是已验证白名单的子集。用户临时输入白名单外 ID 时停止并要求先验证、更新白名单，不得直接用于创建 MR。候选为空时保持兼容，不指定评审人。`reviewerMode=fixed` 时必须配置至少一个 ID，并自动选择全部候选。
 10. 展示 MR 参数、Review 模式和最终评审人并获得明确确认后，调用真实 `create_change_request`；选中评审人时传 `reviewerUserIds`，未选中时省略该参数。
 11. 创建成功后立即使用本 Skill 所属插件根目录的 `scripts/release-state.mjs upsert` 保存 MR ID、链接、分支、创建者、时间和 Review 模式；写入失败时停止，禁止查找仓库同名脚本或改写到其他路径。
-12. 对创建或恢复的 MR 重新查询并核对实际评审人，同时输出 `reviewMode` 及其对当前 MR 的 Review 要求。
+12. 对新创建的 MR 重新查询并核对实际评审人，同时输出 `reviewMode` 及其对当前 MR 的 Review 要求。
 
 ## 约束
 
