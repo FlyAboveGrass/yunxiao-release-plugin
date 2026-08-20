@@ -9,12 +9,11 @@ description: 按项目配置将当前分支发布到 develop、uat 等测试环�
 
 ## 流程
 
-1. 读取 `.agents/yunxiao-release.json` 的 `testDeployments`。用户明确环境时按 `environment` 精确匹配；未明确时展示候选并只选择一个。无法唯一确认时停止询问，禁止猜测。
+1. 读取 `.agents/yunxiao-release.json` 的 `testDeployments`。仅在用户明确要求执行发布时继续；询问发布方式、查看配置或排查问题不触发发布。用户明确环境时按 `environment` 精确匹配；未明确且无法唯一匹配时展示候选并只让用户选择一个，禁止猜测。
 2. 使用本 Skill 所属插件根目录的脚本执行预检：`node scripts/deploy-environment.mjs --dry-run <repo-root> <environment>`。禁止查找或执行目标仓库中的同名脚本。
 3. 预检返回 `mode=manual` 时，只输出 `[打开 <environment> 发布页面](<webUrl>)`。不检查或修改 Git，不调用 webhook，不自动打开浏览器，不要求副作用确认。
-4. 预检返回 `mode=automatic` 时，展示 source、remote release、测试目标分支、push 和 webhook，获得一次明确总确认；未确认不得继续。
-5. 确认后执行 `node scripts/deploy-environment.mjs <repo-root> <environment>`。脚本负责拉取远端分支、将 release 合入当前分支、通过临时 worktree 更新测试分支、非强制推送、验证远端提交、触发 webhook 和清理 worktree。
-6. 成功时输出环境、源提交、远端测试提交和可选流水线链接。失败时原样区分合并、推送、清理和“代码已推送，但构建未触发”，不得宣称回滚远端。
+4. 预检返回 `mode=automatic` 时，输出 source、remote release、测试目标分支、push 和 webhook 后直接执行 `node scripts/deploy-environment.mjs <repo-root> <environment>`，不再要求确认。脚本负责拉取远端分支、将 release 合入当前分支、通过临时 worktree 更新测试分支、非强制推送、验证远端提交、触发 webhook 和清理 worktree。
+5. 成功时输出环境、源提交、远端测试提交和可选流水线链接。失败时原样区分合并、推送、清理和“代码已推送，但构建未触发”，不得宣称回滚远端。
 
 ## 约束
 

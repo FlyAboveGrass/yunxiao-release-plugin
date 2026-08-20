@@ -87,15 +87,15 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 | `repositoryId` | 无，必填 | 云效代码库数字 ID 的字符串形式。推荐由配置 Skill 根据当前 remote 查询并确认。 |
 | `remoteName` | `origin` | 推送和同步使用的 Git remote。可通过 `git remote -v` 确认。 |
 | `targetBranch` | `master` | MR 的目标分支。应按项目分支策略配置。 |
-| `reviewMode` | `ask` | Review 流程模式：`ask` 在创建 MR 后及合并前准备时询问；`required` 要求合并前完整同步并处理评论；`skip` 跳过评论流程。该配置不改变云效审批规则。 |
-| `reviewerMode` | `ask` | 评审人选择模式：`ask` 从白名单中选择一个、多个、全部或不指定，白名单为空时不指定；`fixed` 使用白名单中的全部成员，白名单为空时报错。 |
+| `reviewMode` | `ask` | Review 流程模式：`ask` 将 Review 结果纳入合并前准备的一次总确认；`required` 要求合并前完整同步并处理评论；`skip` 跳过评论流程。该配置不改变云效审批规则。 |
+| `reviewerMode` | `ask` | 评审人选择模式：用户未指定时，`ask` 从白名单中选择一个、多个、全部或不指定；已指定评审人时不再询问。`fixed` 使用白名单中的全部成员，白名单为空时报错。 |
 | `reviewerUserIds` | `[]` | 评审人用户 ID 白名单。配置 Skill 可按成员名称查询并写入；代码库权限需由项目维护者确认。 |
 | `versionFile` | `package.json` | 合并前按配置更新的版本文件。没有统一版本文件时设为 `null`。 |
 | `announcementFile` | `null` | 合并前按配置更新的发版公告。`null` 表示跳过。 |
 | `localConfigFile` | `.agents/yunxiao-release.local.json` | 项目级成员身份配置，必须是项目内相对路径并被 Git 忽略。 |
 | `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 当前分支和 MR 的运行状态，必须是项目内相对路径并被 Git 忽略。 |
 | `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | MR 评论处理记录，必须是项目内相对路径并被 Git 忽略。 |
-| `validationCommands` | `["git diff --check"]` | 创建 MR 和合并前准备阶段执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；每条命令执行前都会展示并确认。 |
+| `validationCommands` | `["git diff --check"]` | 创建 MR 和合并前准备阶段执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；全部命令会纳入对应流程的一次总确认。 |
 | `testDeployments` | `[]` | 环境发布配置。`targetBranch + hookUrl` 表示自动测试发布；仅 `environment + webUrl` 表示生产环境人工发布入口。 |
 
 ## 成员身份与 Token
@@ -159,6 +159,10 @@ npx github:FlyAboveGrass/yunxiao-release-plugin token --check
 | 04 | 处理评论 | `$yunxiao-release:yunxiao-release-04-fix-review-comments` | `/yunxiao-release:yunxiao-release-04-fix-review-comments` | 分析并处理当前 MR 的未解决评论。 |
 | 05 | 云效 MR 合并前准备 | `$yunxiao-release:yunxiao-release-05-finalize` | `/yunxiao-release:yunxiao-release-05-finalize` | 按配置更新版本号、发版资料，验证并在必要时推送到同一 MR，等待人工合并。 |
 | — | 环境发布 | `$yunxiao-release:yunxiao-release-deploy-environment` | `/yunxiao-release:yunxiao-release-deploy-environment` | 发布一个测试环境，或返回生产环境人工发布入口。 |
+
+创建 MR 时若远端目标分支尚未合入当前分支，插件会自动普通合入并非强制推送源分支，不再额外确认；工作区不干净、合并冲突或推送校验失败时停止。
+
+明确要求发布 FAT、UAT 等自动测试环境时，预检通过后直接完成发布，不再重复确认；未明确环境且存在多个候选时才询问环境选择。
 
 ## 常见问题
 
