@@ -34,7 +34,7 @@ const run = () => {
     createdBy: 'user-1',
     sourceBranch: 'feature/example',
     targetBranch: 'master',
-    reviewMode: 'ask',
+    reviewMode: 'skip',
     lastSyncedAt: '2026-07-16T01:01:00.000Z',
   };
   assert.equal(checkConfig(rootDir).config.targetBranch, 'master');
@@ -92,9 +92,12 @@ const run = () => {
   writeJson(resolve(agentsDir, 'yunxiao-release.json'), {
     organizationId: 'org-1',
     repositoryId: 'repo-1',
+    reviewMode: 'ask',
   });
+  assert.equal(Object.hasOwn(readProjectConfig(rootDir), 'reviewMode'), false);
   upsertMr(rootDir, baseRecord);
   upsertMr(rootDir, { ...baseRecord, title: '更新标题' });
+  assert.equal(Object.hasOwn(getCurrentMr(rootDir, 'feature/example'), 'reviewMode'), false);
   upsertMr(rootDir, {
     ...baseRecord,
     mrId: '11',

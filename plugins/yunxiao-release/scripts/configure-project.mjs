@@ -18,7 +18,6 @@ const defaultConfig = {
   repositoryId: '',
   remoteName: 'origin',
   targetBranch: 'master',
-  reviewMode: 'ask',
   reviewerMode: 'ask',
   reviewerUserIds: [],
   versionFile: 'package.json',
@@ -30,7 +29,7 @@ const defaultConfig = {
   testDeployments: [],
 };
 
-export const buildConfig = (existing = {}) => ({ ...defaultConfig, ...existing });
+export const buildConfig = ({ reviewMode: _reviewMode, ...existing } = {}) => ({ ...defaultConfig, ...existing });
 
 const toIgnoreRule = (file) => `/${file.replaceAll('\\', '/')}`;
 

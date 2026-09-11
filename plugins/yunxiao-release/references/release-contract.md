@@ -37,7 +37,6 @@
 | `repositoryId` | 无，必填；配置流程无法唯一确认时停止 | 从 Git remote 提取仓库名，用 `list_repositories` 搜索候选；用户确认后以 `get_repository` 返回的数字 `id` 核对，并将 `String(id)` 作为十进制字符串写入 |
 | `remoteName` | `origin` | 当前项目 `git remote -v` 中指向目标云效仓库的 remote |
 | `targetBranch` | `master` | 项目分支策略和项目维护者决定；使用 `get_branch` 验证存在，不从仓库响应推断默认分支 |
-| `reviewMode` | `ask` | 项目 Review 流程策略，只允许 `ask|required|skip` |
 | `reviewerMode` | `ask` | MR 评审人选择策略，只允许 `ask|fixed` |
 | `reviewerUserIds` | `[]` | `search_organization_members` 返回并由用户确认的 `userId` 白名单；代码库权限另行确认 |
 | `versionFile` | `package.json` | 项目现有版本来源；显式设为 `null` 时跳过版本修改 |
@@ -78,13 +77,7 @@
 
 用户要求“发版”“上线”“发布线上”等操作且意图是正式环境时，必须先按当前 Git、MR 和远端状态完成或重新核验合并前准备，再返回生产环境人工入口；合并前准备未完成时停止。`testDeployments` 缺失或为空数组时，只完成合并前准备并说明未配置生产发布入口，不执行环境发布脚本，也不要求补充配置。不得仅凭上述词语猜测用户要发布正式环境还是测试环境。
 
-`reviewMode` 的行为：
-
-- `ask`：创建 MR 后只说明 Review 要求；合并前准备时先只读同步评论，并把是否按 Review 结果继续纳入该流程的一次总确认。
-- `required`：合并前必须完整同步评论，并处理或确认没有阻塞性的未解决评论。
-- `skip`：不主动同步或处理评论，允许继续合并前准备。
-
-`reviewMode` 不修改云效审批规则，也不能证明 MR 已审批通过。版本文件默认使用 `package.json`，但必须服从项目配置的实际路径；公告文件仍为可选能力，不得假设固定文档路径。
+合并前准备必须完整同步当前 MR 的全局评论、行内评论和回复，并处理或确认没有阻塞性的未解决评论。这不修改云效审批规则，也不能证明 MR 已审批通过。版本文件默认使用 `package.json`，但必须服从项目配置的实际路径；公告文件仍为可选能力，不得假设固定文档路径。
 
 评审人配置使用以下字段：
 
@@ -102,14 +95,14 @@
 - 每个 ID 使用前必须通过 MCP 核对用户 ID、组织归属和启用状态。组织成员身份不能证明代码库权限，白名单的代码库权限由项目维护者确认。
 - “全部”只表示白名单全部成员；不得将全部组织成员作为评审人。
 
-`reviewMode` 控制后续 Review 工作流是否询问、强制或跳过；`reviewerMode` 控制创建 MR 时如何选择人员，两者互不替代。
+`reviewerMode` 控制创建 MR 时如何选择人员；合并前准备始终执行全量评论同步和处理门禁。
 
 ## MR 状态
 
 状态文件以 `organizationId + repositoryId + sourceBranch` 定位记录；每个分支保存 `mergeRequests` 数组。记录至少包含：
 
 - `mrId`、`title`、`url`、`createdAt`、`createdBy`
-- `sourceBranch`、`targetBranch`、`reviewMode`
+- `sourceBranch`、`targetBranch`
 - `mergeStatus`、`mergedAt`、`mergeCommit`、`lastSyncedAt`
 
 同一 `mrId` 必须更新原记录。选择 MR 时先匹配仓库和当前分支，再选择创建时间最新的记录，并通过 MCP 重新查询；本地状态不是云效状态的替代品。

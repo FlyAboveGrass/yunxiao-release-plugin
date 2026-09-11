@@ -23,11 +23,13 @@ const run = () => {
   assert.equal(config.repositoryId, '');
   assert.equal(config.targetBranch, 'master');
   assert.equal(config.remoteName, 'origin');
+  assert.equal(Object.hasOwn(config, 'reviewMode'), false);
   assert.equal(config.reviewerMode, 'ask');
   assert.deepEqual(config.reviewerUserIds, []);
   assert.deepEqual(config.testDeployments, []);
   assert.equal(config.versionFile, 'package.json');
   assert.equal(buildConfig({ versionFile: null }).versionFile, null);
+  assert.equal(Object.hasOwn(buildConfig({ reviewMode: 'skip' }), 'reviewMode'), false);
   assert.equal(buildConfig({ targetBranch: 'main', versionFile: 'VERSION' }).targetBranch, 'main');
   assert.throws(() => writeProjectConfig(rootDir, config), /不是 Git 仓库/);
   execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });

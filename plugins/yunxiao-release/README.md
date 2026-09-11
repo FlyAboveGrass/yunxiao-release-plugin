@@ -57,7 +57,6 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
   "repositoryId": "",
   "remoteName": "origin",
   "targetBranch": "master",
-  "reviewMode": "ask",
   "reviewerMode": "ask",
   "reviewerUserIds": [],
   "versionFile": "package.json",
@@ -87,7 +86,6 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 | `repositoryId` | 无，必填 | 云效代码库数字 ID 的字符串形式。推荐由配置 Skill 根据当前 remote 查询并确认。 |
 | `remoteName` | `origin` | 推送和同步使用的 Git remote。可通过 `git remote -v` 确认。 |
 | `targetBranch` | `master` | MR 的目标分支。应按项目分支策略配置。 |
-| `reviewMode` | `ask` | Review 流程模式：`ask` 将 Review 结果纳入合并前准备的一次总确认；`required` 要求合并前完整同步并处理评论；`skip` 跳过评论流程。该配置不改变云效审批规则。 |
 | `reviewerMode` | `ask` | 评审人选择模式：用户未指定时，`ask` 从白名单中选择一个、多个、全部或不指定；已指定评审人时不再询问。`fixed` 使用白名单中的全部成员，白名单为空时报错。 |
 | `reviewerUserIds` | `[]` | 评审人用户 ID 白名单。配置 Skill 可按成员名称查询并写入；代码库权限需由项目维护者确认。 |
 | `versionFile` | `package.json` | 合并前按配置更新的版本文件。没有统一版本文件时设为 `null`。 |

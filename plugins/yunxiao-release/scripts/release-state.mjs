@@ -12,7 +12,6 @@ const legacyProjectConfigPath = '.codex/yunxiao-release.json';
 const configDefaults = {
   remoteName: 'origin',
   targetBranch: 'master',
-  reviewMode: 'ask',
   versionFile: 'package.json',
   announcementFile: null,
   localConfigFile: '.agents/yunxiao-release.local.json',
@@ -29,7 +28,6 @@ const requiredRecordKeys = [
   'createdBy',
   'sourceBranch',
   'targetBranch',
-  'reviewMode',
   'lastSyncedAt',
 ];
 
@@ -116,10 +114,8 @@ export const readProjectConfig = (rootDir) => {
   if (!existsSync(sourcePath)) fail(`缺少项目共享配置: ${configPath}`);
   const rawConfig = readJson(sourcePath);
   ensureKeys(rawConfig, requiredConfigKeys, '项目共享配置');
-  const config = { ...configDefaults, ...rawConfig };
-  if (!['ask', 'required', 'skip'].includes(config.reviewMode)) {
-    fail(`reviewMode 必须是 ask、required 或 skip，当前为 ${config.reviewMode}`);
-  }
+  const { reviewMode: _reviewMode, ...currentConfig } = rawConfig;
+  const config = { ...configDefaults, ...currentConfig };
   if (!Array.isArray(config.validationCommands) || config.validationCommands.length === 0) {
     fail('validationCommands 必须是非空数组');
   }
@@ -156,18 +152,16 @@ const getState = (rootDir, config) => {
 
 const normalizeRecord = (record) => {
   ensureKeys(record, requiredRecordKeys, 'MR 记录');
-  if (!['ask', 'required', 'skip'].includes(record.reviewMode)) {
-    fail(`MR reviewMode 无效: ${record.reviewMode}`);
-  }
   if (Number.isNaN(Date.parse(record.createdAt)) || Number.isNaN(Date.parse(record.lastSyncedAt))) {
     fail('MR createdAt 和 lastSyncedAt 必须是有效时间');
   }
+  const { reviewMode: _reviewMode, ...normalizedRecord } = record;
   return {
-    ...record,
-    mrId: String(record.mrId),
-    mergeStatus: record.mergeStatus ?? 'opened',
-    mergedAt: record.mergedAt ?? null,
-    mergeCommit: record.mergeCommit ?? null,
+    ...normalizedRecord,
+    mrId: String(normalizedRecord.mrId),
+    mergeStatus: normalizedRecord.mergeStatus ?? 'opened',
+    mergedAt: normalizedRecord.mergedAt ?? null,
+    mergeCommit: normalizedRecord.mergeCommit ?? null,
   };
 };
 
@@ -184,7 +178,7 @@ export const upsertMr = (rootDir, rawRecord) => {
   const nextRecords =
     existingIndex < 0
       ? [...branchRecords, record]
-      : branchRecords.map((item, index) => (index === existingIndex ? { ...item, ...record } : item));
+      : branchRecords.map((item, index) => (index === existingIndex ? normalizeRecord({ ...item, ...record }) : item));
   const nextState = {
     ...state,
     branches: {
@@ -203,7 +197,7 @@ export const getCurrentMr = (rootDir, sourceBranch) => {
   if (records.length === 0) {
     fail(`当前分支没有 MR 记录: ${sourceBranch}`);
   }
-  return records.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+  return normalizeRecord(records.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0]);
 };
 
 // 项目配置覆盖用户级配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
