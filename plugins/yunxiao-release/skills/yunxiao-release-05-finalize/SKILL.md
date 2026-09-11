@@ -9,10 +9,12 @@ description: 在同一个业务 MR 合并前按项目配置更新可选版本文
 
 ## 前置检查
 
-1. 加载共享配置、成员配置和当前分支最新 MR 状态。
+1. 加载共享配置、成员配置、Git remote、当前分支和最新 MR 状态。工作区存在未提交修改时停止并列出文件；目标分支同步只提交 merge 结果，不提交来源不明的业务修改。
 2. 通过 MCP 重新查询 MR，确认仓库、源分支、目标分支、链接和开启状态一致。
-3. 按 MR 记录的 `reviewMode` 检查 Review 门禁：`required` 必须完整同步当前评论并处理或确认没有阻塞性的未解决评论；`ask` 先执行只读评论同步，并把是否按 Review 结果继续纳入本次唯一总确认；`skip` 不要求评论记录。
-4. 检查工作区只包含已知修改，且版本、目标分支或公告规则没有歧义。
+3. 使用配置的 `remoteName` 和 `targetBranch`，先用 `git check-ref-format --branch` 验证源分支和目标分支，再以独立参数执行完整 refspec：`git fetch <remote> +refs/heads/<target>:refs/remotes/<remote>/<target>`。若远端目标分支不是当前分支祖先，立即执行普通 `git merge --no-edit`；冲突时执行 `git merge --abort` 并停止。合并成功后以完整目标 ref `HEAD:refs/heads/<source>` 非强制推送同名远端源分支，并用 `git ls-remote` 验证远端 SHA 与本地 `HEAD` 一致。该同步过程不要求确认；推送失败时输出本地 merge 提交和远端状态并停止。目标分支已合入但远端源分支与本地 `HEAD` 不一致时停止，不擅自推送其他本地提交。
+4. 通过 MCP 校验已同步的远端源分支及同一个 MR 的开启状态。无法证明最新源分支已进入该 MR 时停止。
+5. 按 MR 记录的 `reviewMode` 检查 Review 门禁：`required` 必须完整同步当前评论并处理或确认没有阻塞性的未解决评论；`ask` 先执行只读评论同步，并把是否按 Review 结果继续纳入本次唯一总确认；`skip` 不要求评论记录。
+6. 检查版本、目标分支或公告规则没有歧义。
 
 ## 合并前准备
 
