@@ -5,21 +5,16 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { normalizeMember, readUserMember, resolveUserMemberPath } from './configure-member.mjs';
+import {
+  releaseConfigurationAsLegacyProjectConfig,
+  resolveReleaseConfiguration,
+} from './release-configuration.mjs';
 
-const requiredConfigKeys = ['organizationId', 'repositoryId'];
-const projectConfigPath = '.agents/yunxiao-release.json';
-const legacyProjectConfigPath = '.codex/yunxiao-release.json';
-const configDefaults = {
-  remoteName: 'origin',
-  targetBranch: 'master',
-  versionFile: 'package.json',
-  announcementFile: null,
-  localConfigFile: '.agents/yunxiao-release.local.json',
-  runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
-  commentsFile: '.agents/runtime/yunxiao-release-comments.md',
-  validationCommands: ['git diff --check'],
-  testDeployments: [],
-};
+const requiredConfigKeys = [
+  'organizationId', 'repositoryId', 'remoteName', 'targetBranch', 'reviewerMode', 'reviewerUserIds',
+  'versionFile', 'announcementFile', 'localConfigFile', 'runtimeFile', 'commentsFile',
+  'validationCommands', 'testDeployments',
+];
 const requiredRecordKeys = [
   'mrId',
   'title',
@@ -62,67 +57,19 @@ const resolveProjectPath = (rootDir, configuredPath, label) => {
   return filePath;
 };
 
-const normalizeHttpUrl = (value, label) => {
-  if (typeof value !== 'string' || !value.trim()) fail(`${label} 必须是非空 HTTP(S) URL`);
-  let url;
-  try {
-    url = new URL(value);
-  } catch {
-    fail(`${label} 必须是有效 HTTP(S) URL`);
-  }
-  if (!['http:', 'https:'].includes(url.protocol)) fail(`${label} 只允许 HTTP(S) URL`);
-  return url.toString();
-};
-
-// 自动环境必须同时提供目标分支和 webhook；手动环境只提供可点击的发布入口。
-const normalizeTestDeployments = (deployments) => {
-  if (!Array.isArray(deployments)) fail('testDeployments 必须是数组');
-  const environments = new Set();
-  return deployments.map((deployment, index) => {
-    if (!deployment || typeof deployment !== 'object' || Array.isArray(deployment)) {
-      fail(`testDeployments[${index}] 必须是对象`);
-    }
-    const environment = typeof deployment.environment === 'string' ? deployment.environment.trim() : '';
-    if (!environment || /[\r\n\0]/.test(environment)) fail(`testDeployments[${index}].environment 无效`);
-    if (environments.has(environment)) fail(`testDeployments environment 重复: ${environment}`);
-    environments.add(environment);
-    const hasTargetBranch = deployment.targetBranch !== undefined && deployment.targetBranch !== null;
-    const hasHookUrl = deployment.hookUrl !== undefined && deployment.hookUrl !== null;
-    if (hasTargetBranch !== hasHookUrl) fail(`${environment} 的 targetBranch 和 hookUrl 必须同时配置`);
-    const webUrl = deployment.webUrl === undefined || deployment.webUrl === null
-      ? undefined
-      : normalizeHttpUrl(deployment.webUrl, `${environment}.webUrl`);
-    if (!hasTargetBranch && !webUrl) fail(`${environment} 手动发布环境必须配置 webUrl`);
-    if (!hasTargetBranch) return { environment, webUrl };
-    const targetBranch = typeof deployment.targetBranch === 'string' ? deployment.targetBranch.trim() : '';
-    if (!targetBranch || /[\r\n\0]/.test(targetBranch)) fail(`${environment}.targetBranch 无效`);
-    return {
-      environment,
-      targetBranch,
-      hookUrl: normalizeHttpUrl(deployment.hookUrl, `${environment}.hookUrl`),
-      ...(webUrl ? { webUrl } : {}),
-    };
-  });
-};
-
-// 兼容最小社区配置，并在读取时补齐不会改变云端状态的默认值。
-export const readProjectConfig = (rootDir) => {
-  const configPath = resolve(rootDir, projectConfigPath);
-  const legacyConfigPath = resolve(rootDir, legacyProjectConfigPath);
-  if (existsSync(configPath) && existsSync(legacyConfigPath)) fail('新旧项目共享配置同时存在，请确认保留哪一份');
-  const sourcePath = existsSync(configPath) ? configPath : legacyConfigPath;
-  if (!existsSync(sourcePath)) fail(`缺少项目共享配置: ${configPath}`);
-  const rawConfig = readJson(sourcePath);
-  ensureKeys(rawConfig, requiredConfigKeys, '项目共享配置');
+// 合并项目与全局配置；发布相关字段必须由配置提供。
+export const readProjectConfig = (rootDir, env = process.env) => {
+  const rawConfig = releaseConfigurationAsLegacyProjectConfig(resolveReleaseConfiguration(rootDir, env));
+  ensureKeys(rawConfig, requiredConfigKeys, '合并后的项目配置');
   const { reviewMode: _reviewMode, ...currentConfig } = rawConfig;
-  const config = { ...configDefaults, ...currentConfig };
+  const config = currentConfig;
   if (!Array.isArray(config.validationCommands) || config.validationCommands.length === 0) {
     fail('validationCommands 必须是非空数组');
   }
   ['localConfigFile', 'runtimeFile', 'commentsFile', 'versionFile', 'announcementFile']
     .filter((key) => config[key] !== null)
     .forEach((key) => resolveProjectPath(rootDir, config[key], key));
-  return { ...config, testDeployments: normalizeTestDeployments(config.testDeployments) };
+  return config;
 };
 
 const writeJsonAtomic = (filePath, value) => {
@@ -202,7 +149,7 @@ export const getCurrentMr = (rootDir, sourceBranch) => {
 
 // 项目配置覆盖用户级配置，既支持项目隔离，也让新 worktree 自动复用成员身份。
 export const checkConfig = (rootDir, env = process.env) => {
-  const config = readProjectConfig(rootDir);
+  const config = readProjectConfig(rootDir, env);
   const localConfigPath = resolveProjectPath(rootDir, config.localConfigFile, 'localConfigFile');
   if (existsSync(localConfigPath)) {
     const localConfig = normalizeMember(readJson(localConfigPath));

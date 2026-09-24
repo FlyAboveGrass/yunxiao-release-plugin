@@ -21,11 +21,11 @@
 npx github:FlyAboveGrass/yunxiao-release-plugin
 ```
 
-通过复选框选择 Codex、Claude Code 或两者。安装完成后会生成共享项目配置 `.agents/yunxiao-release.json`，并补充本地配置和运行文件所需的 `.gitignore` 规则。
+通过复选框选择 Codex、Claude Code 或两者。安装只补充本地身份和运行文件所需的 `.gitignore` 规则，不自动创建会遮蔽全局仓库项的项目配置；配置 Skill 根据用户选择写入完整项目配置或全局仓库配置。
 
-建议使用用户级安装：同一宿主的多个项目可共享插件，每个项目仍通过 `.agents/yunxiao-release.json` 保存独立配置。一键安装默认使用用户级作用域。
+建议使用用户级安装：同一宿主的多个项目可共享插件；需要随仓库提交的完整配置使用 `.agents/yunxiao-release.json`，集中管理的仓库使用全局仓库配置。一键安装默认使用用户级作用域。
 
-选择 Codex 时，安装脚本会复用或交互式读取 `YUNXIAO_ACCESS_TOKEN`，保存到 `${CODEX_HOME:-$HOME/.codex}/.env`，然后安装插件。
+选择 Codex 时，安装脚本会复用或交互式读取 `YUNXIAO_ACCESS_TOKEN`，以 `~/.config/yunxiao-release/credentials.env` 为固定来源。插件 MCP 启动代理直接读取该路径，不依赖当前 Orca/Codex 账号的 `CODEX_HOME`；旧 `${CODEX_HOME:-$HOME/.codex}/.env` Token 仅在首次配置时自动迁移。
 
 选择 Claude Code 时，插件安装到用户级作用域。启动 Claude Code 后，先运行 `/plugin configure yunxiao-release@yunxiao-release-community` 配置 Token。
 
@@ -49,52 +49,141 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 
 ## 项目配置
 
+仓库配置按完整来源二选一：项目 `.agents/yunxiao-release.json` 存在时完整使用项目配置并忽略该仓库的全局仓库项；项目文件不存在时使用全局仓库配置。最终配置是“全局默认 + 选中的完整仓库配置”，项目配置与全局仓库配置不逐字段或递归合并。全局默认只允许组织级、存储路径和执行参数等真正可跨仓库复用的字段；仓库 ID、分支、评审人、验证命令和环境发布步骤必须放在完整仓库配置中。
+
+完整字段、类型、替换规则和兼容格式见 [`references/configuration-fields.md`](references/configuration-fields.md)。
+
+全局配置拆分为：
+
+- `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/global-defaults.json`
+- `${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/global-repositories.json`
+
+已有拆分配置可用迁移命令核实并补齐缺失仓库 ID、转换旧阶段和旧执行参数，并把可验证的 webhook 流水线改为统一 pipeline：
+
+```bash
+yunxiao-release migrate-global \
+  --defaults /path/to/global-defaults.json \
+  --repositories /path/to/global-repositories.json \
+  --resolve-repository-ids \
+  --migrate-webhooks frontend-client-deploy \
+  --apply
+```
+
+项目内配置优先级更高；需要保留项目文件时，用同一个迁移脚本从已核实的全局仓库条目同步其仓库 ID 和环境流水线配置：
+
+```bash
+yunxiao-release migrate-global \
+  --defaults /path/to/global-defaults.json \
+  --repositories /path/to/global-repositories.json \
+  --project /path/to/repository \
+  --apply
+```
+
+不传 `--apply` 时只预检并输出摘要；存在无法精确核实的仓库或流水线时不写文件。
+
+全局默认配置示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "organizationId": "组织 ID",
+  "localConfigFile": ".agents/yunxiao-release.local.json",
+  "runtimeFile": ".agents/runtime/yunxiao-release-mr.json",
+  "commentsFile": ".agents/runtime/yunxiao-release-comments.md",
+  "releaseExecution": {
+    "pollIntervalSeconds": 10,
+    "stages": {
+      "frontend-client-deploy": { "initialWaitSeconds": 0, "timeoutSeconds": 1800 },
+      "backend-client-package": { "initialWaitSeconds": 60, "timeoutSeconds": 600 },
+      "backend-server-deploy": { "initialWaitSeconds": 0, "timeoutSeconds": 1800 }
+    }
+  }
+}
+```
+
+全局仓库配置示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "repositories": {
+    "codeup.aliyun.com/example/service": {
+      "repositoryId": "代码库 ID",
+      "remoteName": "origin",
+      "targetBranch": "stable",
+      "reviewerMode": "ask",
+      "reviewerUserIds": [],
+      "versionFile": null,
+      "announcementFile": null,
+      "validationCommands": ["git diff --check"],
+      "environments": {
+        "testing": {
+          "branch": "testing",
+          "steps": [
+            { "type": "promote-branch" },
+            { "type": "webhook", "hookUrl": "https://example.com/webhook" }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+仓库键由 Git remote 标准化得到。每个仓库项可配置 `repositoryId`、MR 目标分支、评审人、版本与公告文件、内部状态路径、验证命令和全部环境发布配置；这些仓库差异字段不能放入全局默认配置。配置 Skill 可读取任意当前会话可访问的格式，规范化并经 MCP 核实后，只展示摘要并写入这两个文件。
+
+MR/环境分支、提交规则、流水线和 Client 触发条件均是仓库数据。插件只校验字段并执行显式步骤，不按项目名称、分组或类型附加组织策略。
+
 共享配置位于 `.agents/yunxiao-release.json`：
 
 ```json
 {
   "organizationId": "",
   "repositoryId": "",
-  "remoteName": "origin",
-  "targetBranch": "master",
+  "remoteName": "upstream",
+  "targetBranch": "stable",
   "reviewerMode": "ask",
   "reviewerUserIds": [],
-  "versionFile": "package.json",
+  "versionFile": "VERSION",
   "announcementFile": null,
   "localConfigFile": ".agents/yunxiao-release.local.json",
   "runtimeFile": ".agents/runtime/yunxiao-release-mr.json",
   "commentsFile": ".agents/runtime/yunxiao-release-comments.md",
   "validationCommands": ["git diff --check"],
-  "testDeployments": [
-    {
-      "environment": "fat",
-      "targetBranch": "develop",
-      "hookUrl": "https://example.com/webhook",
-      "webUrl": "https://example.com/pipeline"
+  "environments": {
+    "fat": {
+      "branch": "testing",
+      "steps": [
+        { "type": "promote-branch" },
+        { "type": "webhook", "hookUrl": "https://example.com/webhook", "webUrl": "https://example.com/pipeline" }
+      ]
     },
-    {
-      "environment": "production",
-      "webUrl": "https://example.com/production-pipeline"
+    "production": {
+      "branch": null,
+      "steps": [
+        { "type": "manual-link", "webUrl": "https://example.com/production-pipeline" }
+      ]
     }
-  ]
+  }
 }
 ```
 
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `organizationId` | 无，必填 | 云效组织 ID。推荐由配置 Skill 查询并确认，也可在云效“管理后台 > 基本信息”查看。 |
-| `repositoryId` | 无，必填 | 云效代码库数字 ID 的字符串形式。推荐由配置 Skill 根据当前 remote 查询并确认。 |
-| `remoteName` | `origin` | 推送和同步使用的 Git remote。可通过 `git remote -v` 确认。 |
-| `targetBranch` | `master` | MR 的目标分支。应按项目分支策略配置。 |
+| `repositoryId` | MR 流程必填 | 云效代码库数字 ID 的字符串形式；已有值直接使用，缺失时配置 Skill 根据当前 remote 查询、核实并持久化。 |
+| `remoteName` | 配置必填 | 推送和同步使用的 Git remote。可通过 `git remote -v` 确认。 |
+| `targetBranch` | 配置必填 | MR 的目标分支。应按项目分支策略配置。 |
 | `reviewerMode` | `ask` | 评审人选择模式：用户未指定时，`ask` 从白名单中选择一个、多个、全部或不指定；已指定评审人时不再询问。`fixed` 使用白名单中的全部成员，白名单为空时报错。 |
 | `reviewerUserIds` | `[]` | 评审人用户 ID 白名单。配置 Skill 可按成员名称查询并写入；代码库权限需由项目维护者确认。 |
-| `versionFile` | `package.json` | 合并前按配置更新的版本文件。没有统一版本文件时设为 `null`。 |
+| `versionFile` | 配置必填，可为 `null` | 合并前按配置更新的版本文件。没有统一版本文件时设为 `null`。 |
 | `announcementFile` | `null` | 合并前按配置更新的发版公告。`null` 表示跳过。 |
 | `localConfigFile` | `.agents/yunxiao-release.local.json` | 项目级成员身份配置，必须是项目内相对路径并被 Git 忽略。 |
 | `runtimeFile` | `.agents/runtime/yunxiao-release-mr.json` | 当前分支和 MR 的运行状态，必须是项目内相对路径并被 Git 忽略。 |
 | `commentsFile` | `.agents/runtime/yunxiao-release-comments.md` | MR 评论处理记录，必须是项目内相对路径并被 Git 忽略。 |
-| `validationCommands` | `["git diff --check"]` | 创建 MR 和合并前准备阶段执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；全部命令会纳入对应流程的一次总确认。 |
-| `testDeployments` | `[]` | 环境发布配置。`targetBranch + hookUrl` 表示自动测试发布；仅 `environment + webUrl` 表示生产环境人工发布入口。 |
+| `validationCommands` | 配置必填 | 创建 MR 和合并前准备阶段执行的最低验证命令。根据项目规则、CI 和现有脚本配置，必须是非空数组；全部命令会纳入对应流程的一次总确认。 |
+| `environments` | `{}` | 统一环境发布配置。每个环境显式声明目标分支和有序步骤；支持 `promote-branch`、`pipeline`、`webhook`、`manual-link`。`pipeline.stage` 只允许 `frontend-client-deploy`、`backend-client-package`、`backend-server-deploy`；可用 `candidates` 声明等价流水线并由 Planner 均衡选择。 |
+| `testDeployments` | `[]` | 已发布旧格式，继续兼容；读取时转换为 `environments`，新配置不再使用。 |
 
 ## 成员身份与 Token
 
@@ -104,6 +193,12 @@ npx github:FlyAboveGrass/yunxiao-release-plugin configure
 - 用户级：`${XDG_CONFIG_HOME:-$HOME/.config}/yunxiao-release/member.json`
 
 项目级配置优先于用户级配置。用户级配置可供 Codex、Claude Code 和同一用户的多个 worktree 共用。
+
+## 前后端 FAT 发版
+
+`yunxiao-release fat-flow` 和单仓库环境发布共用同一套 `environments` 配置、Environment Release Planner 与 Pipeline Executor。`pipeline` 步骤通过 `stage` 表示 `frontend-client-deploy`、`backend-client-package` 或 `backend-server-deploy`，通过可选 `when.changedPaths` 表示路径触发条件；插件不再维护独立的前后端识别规则。旧 `projects.json` 中的 `fatFlow` 及仓库 `projectType`、`fatTargetBranch`、`clientDetection` 仅作为向后兼容输入，由 Release Configuration module 转换为同一计划；新的拆分全局配置禁止这些旧字段。插件包不携带真实项目名、分支或流水线 ID。
+
+`deploy-environment` 可执行单仓库 `promote-branch + pipeline`、`promote-branch + webhook`，或返回 `manual-link`；`yunxiao-release fat-flow` 使用同一 Planner 与 Pipeline Executor 编排多仓库。一个环境不能同时配置 `pipeline` 与 `webhook`。
 
 推荐使用配置 Skill 生成，内容如下：
 
@@ -137,7 +232,7 @@ Codex 更新 Token：
 npx github:FlyAboveGrass/yunxiao-release-plugin token
 ```
 
-检查当前 Codex Home 是否已配置 Token：
+检查固定全局路径是否已配置 Token：
 
 ```bash
 npx github:FlyAboveGrass/yunxiao-release-plugin token --check
@@ -156,13 +251,14 @@ npx github:FlyAboveGrass/yunxiao-release-plugin token --check
 | 03 | 同步评论 | `$yunxiao-release:yunxiao-release-03-sync-comments` | `/yunxiao-release:yunxiao-release-03-sync-comments` | 完整同步当前 MR 的全局评论、行内评论和回复。 |
 | 04 | 处理评论 | `$yunxiao-release:yunxiao-release-04-fix-review-comments` | `/yunxiao-release:yunxiao-release-04-fix-review-comments` | 分析并处理当前 MR 的未解决评论。 |
 | 05 | 云效 MR 合并前准备 | `$yunxiao-release:yunxiao-release-05-finalize` | `/yunxiao-release:yunxiao-release-05-finalize` | 按配置更新版本号、发版资料，验证并在必要时推送到同一 MR，等待人工合并。 |
-| — | 环境发布 | `$yunxiao-release:yunxiao-release-deploy-environment` | `/yunxiao-release:yunxiao-release-deploy-environment` | 发布一个测试环境，或返回生产环境人工发布入口。 |
+| — | 单仓库环境发布 | `$yunxiao-release:yunxiao-release-deploy-environment` | `/yunxiao-release:yunxiao-release-deploy-environment` | 发布当前单个仓库到指定环境，或返回其生产环境人工发布入口。 |
+| — | 多仓库 FAT 发布 | `$yunxiao-release:yunxiao-release-deploy-multi-repository` | `/yunxiao-release:yunxiao-release-deploy-multi-repository` | 编排两个及以上仓库的分支推进及前后端 FAT 流水线。 |
 
 创建 MR 时若远端目标分支尚未合入当前分支，插件会自动普通合入并非强制推送源分支，不再额外确认；工作区不干净、合并冲突或推送校验失败时停止。
 
 明确要求发布 FAT、UAT 等自动测试环境时，预检通过后直接完成发布，不再重复确认；未明确环境且存在多个候选时才询问环境选择。
 
-明确要求发布正式环境时，插件先核验并补齐 05 合并前准备，再返回人工发布入口。`testDeployments` 未配置或为空数组时，只完成合并前准备，不返回生产发布地址。
+明确要求发布正式环境时，插件先核验并补齐 05 合并前准备，再返回 `manual-link` 人工发布入口。对应 `environments` 项未配置时，只完成合并前准备，不返回生产发布地址。
 
 ## 常见问题
 

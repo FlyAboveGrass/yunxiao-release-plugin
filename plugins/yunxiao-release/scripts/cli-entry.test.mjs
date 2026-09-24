@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,21 +28,21 @@ const run = () => {
   assert.equal(projectResult.status, 0, projectResult.stderr);
   assert.match(projectResult.stdout, /项目配置已写入/);
   const projectConfig = JSON.parse(readFileSync(resolve(projectDir, '.agents/yunxiao-release.json')));
-  assert.equal(projectConfig.targetBranch, 'master');
+  assert.equal(projectConfig.targetBranch, undefined);
   assert.equal(projectConfig.reviewerMode, 'ask');
   assert.deepEqual(projectConfig.reviewerUserIds, []);
 
   const missingTokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
     encoding: 'utf8',
-    env: { ...process.env, CODEX_HOME: codexHome },
+    env: { ...process.env, HOME: rootDir, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(missingTokenResult.status, 1);
 
-  const invalidEnvPath = resolve(codexHome, '.env');
+  const invalidEnvPath = resolve(xdgConfigHome, 'yunxiao-release/credentials.env');
   mkdirSync(invalidEnvPath, { recursive: true });
   const failedTokenCheckResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
     encoding: 'utf8',
-    env: { ...process.env, CODEX_HOME: codexHome },
+    env: { ...process.env, HOME: rootDir, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(failedTokenCheckResult.status, 2);
   rmSync(invalidEnvPath, { recursive: true });
@@ -50,13 +50,14 @@ const run = () => {
   const tokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs')], {
     input: 'test-token',
     encoding: 'utf8',
-    env: { ...process.env, CODEX_HOME: codexHome },
+    env: { ...process.env, HOME: rootDir, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(tokenResult.status, 0, tokenResult.stderr);
-  assert.equal(readFileSync(resolve(codexHome, '.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
+  assert.equal(existsSync(resolve(codexHome, '.env')), false);
+  assert.equal(readFileSync(resolve(xdgConfigHome, 'yunxiao-release/credentials.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
   const existingTokenResult = spawnSync('node', [resolve(aliasDir, 'configure-token.mjs'), '--check'], {
     encoding: 'utf8',
-    env: { ...process.env, CODEX_HOME: codexHome },
+    env: { ...process.env, HOME: rootDir, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(existingTokenResult.status, 0, existingTokenResult.stderr);
 
@@ -66,7 +67,7 @@ const run = () => {
     env: { ...process.env, CODEX_HOME: codexHome, XDG_CONFIG_HOME: xdgConfigHome },
   });
   assert.equal(memberResult.status, 0, memberResult.stderr);
-  assert.equal(readFileSync(resolve(codexHome, '.env'), 'utf8'), 'YUNXIAO_ACCESS_TOKEN=test-token\n');
+  assert.equal(existsSync(resolve(codexHome, '.env')), false);
   assert.deepEqual(JSON.parse(readFileSync(resolve(xdgConfigHome, 'yunxiao-release/member.json'))), {
     displayName: '测试成员',
     userId: 'user-1',
@@ -79,11 +80,32 @@ const run = () => {
   const helpResult = spawnSync('node', [publicCli, '--help'], { encoding: 'utf8' });
   assert.equal(helpResult.status, 0, helpResult.stderr);
   assert.match(helpResult.stdout, /yunxiao-release configure/);
+  const globalResult = spawnSync('node', [publicCli, 'global', '--init'], {
+    encoding: 'utf8',
+    env: { ...process.env, HOME: rootDir, XDG_CONFIG_HOME: xdgConfigHome },
+  });
+  assert.equal(globalResult.status, 0, globalResult.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(resolve(xdgConfigHome, 'yunxiao-release/global-defaults.json'))), { schemaVersion: 1 });
+  assert.deepEqual(JSON.parse(readFileSync(resolve(xdgConfigHome, 'yunxiao-release/global-repositories.json'))), {
+    schemaVersion: 1, repositories: {},
+  });
+  const globalApplyResult = spawnSync('node', [publicCli, 'global', 'apply'], {
+    input: JSON.stringify({ defaults: { organizationId: 'org-1' }, repositories: {} }),
+    encoding: 'utf8',
+    env: { ...process.env, HOME: rootDir, XDG_CONFIG_HOME: xdgConfigHome },
+  });
+  assert.equal(globalApplyResult.status, 0, globalApplyResult.stderr);
+  assert.deepEqual(JSON.parse(globalApplyResult.stdout), {
+    defaultFieldCount: 1, repositoryCount: 0,
+  });
+  const fatHelpResult = spawnSync('node', [publicCli, 'fat-flow', '--help'], { encoding: 'utf8' });
+  assert.equal(fatHelpResult.status, 0, fatHelpResult.stderr);
+  assert.match(fatHelpResult.stdout, /run-full-fat-flow-deploy/);
   const cliProject = resolve(rootDir, 'cli-project');
   execFileSync('git', ['init', cliProject], { stdio: 'ignore' });
   const configureResult = spawnSync('node', [publicCli, 'configure'], { cwd: cliProject, encoding: 'utf8' });
   assert.equal(configureResult.status, 0, configureResult.stderr);
-  assert.equal(JSON.parse(readFileSync(resolve(cliProject, '.agents/yunxiao-release.json'))).targetBranch, 'master');
+  assert.equal(JSON.parse(readFileSync(resolve(cliProject, '.agents/yunxiao-release.json'))).targetBranch, undefined);
 
   rmSync(rootDir, { recursive: true, force: true });
   console.log('cli entry self-test passed');

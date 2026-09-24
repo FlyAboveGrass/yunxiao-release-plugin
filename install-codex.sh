@@ -46,7 +46,7 @@ configure_marketplace() {
   codex plugin marketplace add "$REPOSITORY" --ref main
 }
 
-# 检测 Codex Home 中已有的云效 Token；仅在缺失时通过终端隐藏输入。
+# 检测固定全局路径中的云效 Token；仅在缺失时通过终端隐藏输入。
 configure_token() {
   local token_script="$1"
   local check_output
@@ -98,8 +98,7 @@ main() {
   codex plugin add "$PLUGIN@$MARKETPLACE"
 
   readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  (cd "$PROJECT_ROOT" && node "$project_script")
-  test -f "$PROJECT_ROOT/.agents/yunxiao-release.json" || { echo '项目配置生成失败' >&2; exit 1; }
+  (cd "$PROJECT_ROOT" && node "$project_script" --ignore-only)
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

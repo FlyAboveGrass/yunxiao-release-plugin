@@ -16,17 +16,11 @@ const legacyProjectConfigPath = '.codex/yunxiao-release.json';
 const defaultConfig = {
   organizationId: '',
   repositoryId: '',
-  remoteName: 'origin',
-  targetBranch: 'master',
   reviewerMode: 'ask',
   reviewerUserIds: [],
-  versionFile: 'package.json',
-  announcementFile: null,
   localConfigFile: '.agents/yunxiao-release.local.json',
   runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
   commentsFile: '.agents/runtime/yunxiao-release-comments.md',
-  validationCommands: ['git diff --check'],
-  testDeployments: [],
 };
 
 export const buildConfig = ({ reviewMode: _reviewMode, ...existing } = {}) => ({ ...defaultConfig, ...existing });
@@ -96,7 +90,7 @@ const validateProjectPath = (rootDir, configuredPath, label) => {
 
 const validateProjectPaths = (rootDir, config) => {
   ['localConfigFile', 'runtimeFile', 'commentsFile', 'versionFile', 'announcementFile']
-    .filter((key) => config[key] !== null)
+    .filter((key) => config[key] !== null && config[key] !== undefined)
     .forEach((key) => validateProjectPath(rootDir, config[key], key));
   validateProjectPath(rootDir, projectConfigPath, 'configFile');
   validateProjectPath(rootDir, '.gitignore', 'gitignoreFile');
@@ -118,6 +112,12 @@ export const writeProjectConfig = (rootDir, config) => {
     throw error;
   }
   return filePath;
+};
+
+export const configurePrivatePaths = (rootDir) => {
+  if (!existsSync(resolve(rootDir, '.git'))) throw new Error(`当前目录不是 Git 仓库：${rootDir}`);
+  validateProjectPaths(rootDir, defaultConfig);
+  updateGitignore(rootDir, defaultConfig);
 };
 
 // 迁移前统一检查冲突，禁止在两份本地状态之间猜测应采用哪一份。
@@ -176,10 +176,15 @@ export const configureProject = (rootDir) => {
 
 const main = () => {
   if (process.argv.includes('--help')) {
-    console.log(`Usage: node configure-project.mjs\n\n在当前 Git 项目生成 ${projectConfigPath}。`);
+    console.log(`Usage: node configure-project.mjs [--ignore-only]\n\n默认生成 ${projectConfigPath}；--ignore-only 只配置本地状态忽略规则。`);
     return;
   }
-  if (process.argv.length > 2) throw new Error('configure-project 不接受参数；生成后请直接编辑配置文件');
+  if (process.argv[2] === '--ignore-only' && process.argv.length === 3) {
+    configurePrivatePaths(process.cwd());
+    console.log('项目本地状态忽略规则已配置');
+    return;
+  }
+  if (process.argv.length > 2) throw new Error('configure-project 仅接受 --ignore-only');
   console.log(`项目配置已写入 ${configureProject(process.cwd())}`);
 };
 

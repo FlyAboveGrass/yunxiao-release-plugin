@@ -56,6 +56,14 @@ const run = async () => {
       repositoryId: 'repo-1',
       remoteName: 'origin',
       targetBranch: 'release',
+      reviewerMode: 'ask',
+      reviewerUserIds: [],
+      versionFile: null,
+      announcementFile: null,
+      localConfigFile: '.agents/yunxiao-release.local.json',
+      runtimeFile: '.agents/runtime/yunxiao-release-mr.json',
+      commentsFile: '.agents/runtime/yunxiao-release-comments.md',
+      validationCommands: ['git diff --check'],
       testDeployments: [
         {
           environment: 'fat',
@@ -106,7 +114,7 @@ const run = async () => {
     rmSync(resolve(repo, '.agents/yunxiao-release.local.json'));
     assert.equal(
       planEnvironmentDeployment(repo, 'fat', { ...process.env, XDG_CONFIG_HOME: xdgConfigHome }).mode,
-      'automatic',
+      'automatic-webhook',
     );
     writeJson(resolve(repo, '.agents/yunxiao-release.local.json'), {
       displayName: '项目成员',
@@ -144,6 +152,53 @@ const run = async () => {
       /代码已推送，但构建未触发: Webhook 返回 HTTP 500/,
     );
     assert.equal(git(repo, ['worktree', 'list', '--porcelain']).match(/^worktree /gm)?.length, 1);
+    writeJson(resolve(xdgConfigHome, 'yunxiao-release/global-defaults.json'), {
+      schemaVersion: 1,
+      releaseExecution: { pollIntervalSeconds: 1, clientInitialWaitSeconds: 0, clientTimeoutSeconds: 10, serverTimeoutSeconds: 10 },
+    });
+    writeJson(resolve(xdgConfigHome, 'yunxiao-release/global-repositories.json'), { schemaVersion: 1, repositories: {} });
+    const sharedConfigPath = resolve(repo, '.agents/yunxiao-release.json');
+    const sharedConfig = JSON.parse(readFileSync(sharedConfigPath, 'utf8'));
+    delete sharedConfig.testDeployments;
+    sharedConfig.environments = {
+      fat: {
+        branch: 'develop',
+        steps: [
+          { type: 'promote-branch' },
+          { type: 'pipeline', stage: 'backend-client-package', pipelineName: 'client', pipelineId: '100', params: { envs: {} }, when: { changedPaths: ['feature.txt'] } },
+          { type: 'pipeline', stage: 'backend-server-deploy', pipelineName: 'server', pipelineId: '200', params: { envs: {} } },
+        ],
+      },
+    };
+    writeJson(sharedConfigPath, sharedConfig);
+    git(repo, ['add', sharedConfigPath]);
+    git(repo, ['commit', '-m', 'configure pipeline deployment']);
+    assert.equal(
+      planEnvironmentDeployment(repo, 'fat', { ...process.env, XDG_CONFIG_HOME: xdgConfigHome }).mode,
+      'automatic-pipeline',
+    );
+    let executedPipelinePlan;
+    const pipelineResult = await deployEnvironment(repo, 'fat', {
+      env: { ...process.env, XDG_CONFIG_HOME: xdgConfigHome },
+      executePipelinePlan: (plan) => { executedPipelinePlan = plan; },
+    });
+    assert.equal(pipelineResult.pipelineTriggered, true);
+    assert.deepEqual(executedPipelinePlan.stages.map(({ name }) => name), ['backend-client-package', 'backend-server-deploy']);
+    assert.deepEqual(executedPipelinePlan.stages[1].steps[0].params, { envs: {} });
+    sharedConfig.environments.fat.steps.push({ type: 'webhook', hookUrl: `http://127.0.0.1:${port}/hook` });
+    writeJson(sharedConfigPath, sharedConfig);
+    git(repo, ['add', sharedConfigPath]);
+    git(repo, ['commit', '-m', 'configure invalid duplicate trigger']);
+    assert.throws(
+      () => planEnvironmentDeployment(repo, 'fat', { ...process.env, XDG_CONFIG_HOME: xdgConfigHome }),
+      /不能同时配置 pipeline 和 webhook/,
+    );
+    delete sharedConfig.environments;
+    sharedConfig.testDeployments = [
+      { environment: 'fat', targetBranch: 'develop', hookUrl: `http://127.0.0.1:${port}/hook`, webUrl: 'https://example.com/fat' },
+      { environment: 'production', webUrl: 'https://example.com/production' },
+    ];
+    writeJson(sharedConfigPath, sharedConfig);
     writeFileSync(resolve(repo, 'dirty.txt'), 'dirty\n');
     assert.throws(() => planEnvironmentDeployment(repo, 'fat'), /工作区干净/);
     console.log('deploy environment self-test passed');

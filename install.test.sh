@@ -21,6 +21,7 @@ readonly EXPECTED_SKILLS=(
   yunxiao-release-04-fix-review-comments
   yunxiao-release-05-finalize
   yunxiao-release-deploy-environment
+  yunxiao-release-deploy-multi-repository
 )
 actual_skill_count="$(find "$ROOT_DIR/plugins/yunxiao-release/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 if [[ "$actual_skill_count" -ne "${#EXPECTED_SKILLS[@]}" ]]; then
@@ -181,6 +182,7 @@ if [[ "$actual_calls" != 'plugin marketplace list' ]]; then
 fi
 
 export CODEX_HOME="$TEST_DIR/codex-home"
+export XDG_CONFIG_HOME="$TEST_DIR/xdg-config"
 mkdir -p "$CODEX_HOME"
 printf 'YUNXIAO_ACCESS_TOKEN=existing-token\n' >"$CODEX_HOME/.env"
 token_output="$(configure_token "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-token.mjs")"
@@ -207,14 +209,19 @@ fi
 
 rm -rf "$CODEX_HOME"
 mkdir -p "$CODEX_HOME"
+rm -f "$XDG_CONFIG_HOME/yunxiao-release/credentials.env"
 # 标准输入模拟首次写入并验证输出不含 Token；终端隐藏参数和 /dev/tty 重定向另行锁定。
 token_output="$(configure_token "$ROOT_DIR/plugins/yunxiao-release/scripts/configure-token.mjs" <<<'first-secret-token' 2>&1)"
 if [[ "$token_output" == *'first-secret-token'* ]]; then
   echo 'Token 输入不应回显到终端' >&2
   exit 1
 fi
-if [[ "$(<"$CODEX_HOME/.env")" != 'YUNXIAO_ACCESS_TOKEN=first-secret-token' ]]; then
-  echo '首次输入的 Token 没有正确写入 Codex Home' >&2
+if [[ -e "$CODEX_HOME/.env" ]]; then
+  echo '首次输入的 Token 不应写入账号相关 Codex Home' >&2
+  exit 1
+fi
+if [[ "$(<"$XDG_CONFIG_HOME/yunxiao-release/credentials.env")" != 'YUNXIAO_ACCESS_TOKEN=first-secret-token' ]]; then
+  echo '首次输入的 Token 没有正确写入全局凭据文件' >&2
   exit 1
 fi
 if ! grep -Fq 'IFS= read -r -s access_token' "$ROOT_DIR/install-codex.sh"; then
