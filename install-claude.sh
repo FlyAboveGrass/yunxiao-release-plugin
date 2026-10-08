@@ -57,7 +57,7 @@ configure_claude_plugin() {
   fi
 }
 
-# 主流程只安装插件并生成共享项目配置；Token 由用户在 Claude Code 中配置。
+# 安装不依赖当前目录；仅在 Git 项目内补齐本地状态忽略规则，Token 由用户在 Claude Code 中配置。
 main() {
   for command in git node claude; do
     command -v "$command" >/dev/null || { echo "缺少命令：$command" >&2; exit 1; }
@@ -66,19 +66,21 @@ main() {
     echo '需要 Node.js 20 或更高版本' >&2
     exit 1
   }
-  git rev-parse --show-toplevel >/dev/null 2>&1 || { echo '请在 Git 项目内执行安装命令' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
   readonly TEMP_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMP_DIR"' EXIT
-  local project_script
-  project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
+  local project_script project_root
 
   configure_claude_marketplace
   configure_claude_plugin </dev/tty
 
-  readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  (cd "$PROJECT_ROOT" && node "$project_script" --ignore-only)
+  if project_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
+    (cd "$project_root" && node "$project_script" --ignore-only)
+  else
+    echo '插件已安装；当前目录不在 Git 仓库内，使用前请进入目标 Git 仓库根目录，运行云效发版配置 Skill 完成项目配置和忽略规则设置。'
+  fi
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

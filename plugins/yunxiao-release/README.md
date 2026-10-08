@@ -15,13 +15,13 @@
 
 代码库的个人访问令牌的获取方式在： https://account-devops.aliyun.com/settings/personalAccessToken 。
 
-进入目标 Git 项目运行：
+在任意目录运行：
 
 ```bash
 npx github:FlyAboveGrass/yunxiao-release-plugin
 ```
 
-通过复选框选择 Codex、Claude Code 或两者。安装只补充本地身份和运行文件所需的 `.gitignore` 规则，不自动创建会遮蔽全局仓库项的项目配置；配置 Skill 根据用户选择写入完整项目配置或全局仓库配置。
+通过复选框选择 Codex、Claude Code 或两者。在 Git 项目内安装时，只补充仓库根目录下本地身份和运行文件所需的 `.gitignore` 规则，不自动创建会遮蔽全局仓库项的项目配置；在非 Git 目录安装时，跳过项目文件配置，并提示使用前进入目标 Git 仓库根目录运行云效发版配置 Skill。配置 Skill 根据用户选择写入完整项目配置或全局仓库配置。
 
 建议使用用户级安装：同一宿主的多个项目可共享插件；需要随仓库提交的完整配置使用 `.agents/yunxiao-release.json`，集中管理的仓库使用全局仓库配置。一键安装默认使用用户级作用域。
 
@@ -29,7 +29,7 @@ npx github:FlyAboveGrass/yunxiao-release-plugin
 
 选择 Claude Code 时，插件安装到用户级作用域。启动 Claude Code 后，先运行 `/plugin configure yunxiao-release@yunxiao-release-community` 配置 Token。
 
-安装后初始化项目配置和当前成员身份：
+安装后进入目标 Git 仓库根目录，初始化项目配置、忽略规则和当前成员身份：
 
 ```text
 # Codex

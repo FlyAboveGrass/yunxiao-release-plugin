@@ -78,7 +78,6 @@ choose_installers() {
 # 统一入口只负责选择宿主，具体安装和认证仍由已验证的宿主脚本处理。
 main() {
   command -v git >/dev/null || { echo '缺少命令：git' >&2; exit 1; }
-  git rev-parse --show-toplevel >/dev/null 2>&1 || { echo '请在 Git 项目内执行安装命令' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
   local installers installer installer_path

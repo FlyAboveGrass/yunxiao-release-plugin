@@ -11,3 +11,4 @@ done
 python3 -m unittest discover -s plugins/yunxiao-release/scripts/fat-flow -p 'test_*.py'
 bash install.test.sh
 bash install-claude.test.sh
+bash install-directory.test.sh

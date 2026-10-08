@@ -73,7 +73,7 @@ configure_token() {
   printf '%s' "$access_token" | node "$token_script"
 }
 
-# 主流程依次验证环境、配置 Token、安装插件并初始化当前 Git 项目。
+# 安装不依赖当前目录；仅在 Git 项目内补齐本地状态忽略规则。
 main() {
   for command in git node codex; do
     command -v "$command" >/dev/null || { echo "缺少命令：$command" >&2; exit 1; }
@@ -83,22 +83,24 @@ main() {
     exit 1
   }
 
-  git rev-parse --show-toplevel >/dev/null 2>&1 || { echo '请在 Git 项目内执行安装命令' >&2; exit 1; }
   [[ -r /dev/tty ]] || { echo '安装需要交互式终端' >&2; exit 1; }
 
   readonly TEMP_DIR="$(mktemp -d)"
   trap 'rm -rf "$TEMP_DIR"' EXIT
-  local token_script project_script
+  local token_script project_script project_root
   token_script="$(prepare_script configure-token.mjs "$TEMP_DIR")"
-  project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
 
   configure_token "$token_script" </dev/tty
 
   configure_marketplace
   codex plugin add "$PLUGIN@$MARKETPLACE"
 
-  readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  (cd "$PROJECT_ROOT" && node "$project_script" --ignore-only)
+  if project_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    project_script="$(prepare_script configure-project.mjs "$TEMP_DIR")"
+    (cd "$project_root" && node "$project_script" --ignore-only)
+  else
+    echo '插件已安装；当前目录不在 Git 仓库内，使用前请进入目标 Git 仓库根目录，运行云效发版配置 Skill 完成项目配置和忽略规则设置。'
+  fi
 }
 
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
