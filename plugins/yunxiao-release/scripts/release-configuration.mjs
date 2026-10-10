@@ -280,6 +280,9 @@ const normalizeEnvironments = (value) => {
     if (steps.some(({ type }) => type === 'pipeline') && steps.some(({ type }) => type === 'webhook')) {
       fail(`environments.${name} 不能同时配置 pipeline 和 webhook`);
     }
+    if (environment.dependsOn !== undefined || environment.preflightMergeBranches !== undefined) {
+      fail(`environments.${name} 的 dependsOn/preflightMergeBranches 不是固定配置；请在本次发布命令中指定`);
+    }
     return [name, {
       branch: typeof branch === 'string' ? branch.trim() : null,
       steps,

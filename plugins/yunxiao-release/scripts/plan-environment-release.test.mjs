@@ -48,6 +48,47 @@ try {
   assert.equal(plan.stages[2].steps[0].pipelineId, '200');
   assert.deepEqual(plan.unresolved, []);
 
+  const repositoryConfig = JSON.parse(readFileSync(repositoriesPath, 'utf8'));
+  const wxKey = 'example.com/team/monkey-wx';
+  repositoryConfig.repositories[wxKey] = {
+    ...repositoryConfig.repositories[repositoryKey], repositoryId: '2',
+    environments: { fat: {
+      branch: 'testing',
+      steps: [{ type: 'pipeline', stage: 'backend-server-deploy', pipelineName: 'wx-server', pipelineId: '201', params: { envs: {} } }],
+    } },
+  };
+  writeFileSync(repositoriesPath, `${JSON.stringify(repositoryConfig)}\n`);
+  const orderedResult = spawnSync('node', [
+    resolve(scriptsDir, 'fat-flow/plan_environment_release.mjs'),
+    '--repository-keys', `${repositoryKey},${wxKey}`, '--client-repository-keys', '', '--branch', 'feature/demo',
+    '--depends-on', 'backend-app:monkey-wx',
+    '--defaults-config', defaultsPath, '--repositories-config', repositoriesPath, '--output', outputPath,
+  ], { encoding: 'utf8' });
+  assert.equal(orderedResult.status, 0, orderedResult.stderr);
+  const orderedPlan = JSON.parse(readFileSync(outputPath, 'utf8'));
+  assert.deepEqual(orderedPlan.waves.map(({ projects }) => projects), [['monkey-wx'], ['backend-app']]);
+  assert.deepEqual(orderedPlan.waves.map(({ stages }) => stages[2].steps[0].project), ['monkey-wx', 'backend-app']);
+  assert.deepEqual(orderedPlan.request.dependencies, [{ consumer: 'backend-app', provider: 'monkey-wx' }]);
+
+  const resumeState = resolve(root, 'run-state.json');
+  writeFileSync(`${resumeState}.plan.json`, `${JSON.stringify(orderedPlan)}\n`);
+  const changedReleaseInputs = spawnSync('node', [
+    resolve(scriptsDir, 'fat-flow/plan_environment_release.mjs'),
+    '--repository-keys', `${repositoryKey},${wxKey}`, '--branch', 'feature/demo',
+    '--resume', '--run', '--state-file', resumeState,
+  ], { encoding: 'utf8' });
+  assert.notEqual(changedReleaseInputs.status, 0);
+  assert.match(changedReleaseInputs.stderr, /续跑输入与原发布计划不一致/);
+
+  const cycleResult = spawnSync('node', [
+    resolve(scriptsDir, 'fat-flow/plan_environment_release.mjs'),
+    '--repository-keys', `${repositoryKey},${wxKey}`, '--client-repository-keys', '', '--branch', 'feature/demo',
+    '--depends-on', 'backend-app:monkey-wx', '--depends-on', 'monkey-wx:backend-app',
+    '--defaults-config', defaultsPath, '--repositories-config', repositoriesPath, '--output', outputPath, '--validate',
+  ], { encoding: 'utf8' });
+  assert.notEqual(cycleResult.status, 0);
+  assert.match(cycleResult.stderr, /发布依赖存在环/);
+
   const configHome = resolve(root, 'config');
   const configDir = resolve(configHome, 'yunxiao-release');
   const repository = resolve(root, 'renamed-worktree');

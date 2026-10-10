@@ -74,6 +74,7 @@
 |---|---|---|
 | `branch` | string\|null | 自动发布的环境目标分支；纯人工入口为 `null` |
 | `steps` | object[] | 按顺序声明的环境动作 |
+项目先后关系与额外构建分支预检取决于本次改动，不写入 `environments`。多仓发布时按实际变更传入 `--depends-on <consumer:provider>` 和 `--preflight-merge-branch <project:branch>`；两者都可重复，未指定时不附加顺序或额外分支预检。`dependsOn`、`preflightMergeBranches` 作为固定配置会被拒绝。
 
 ## Step 字段
 
@@ -105,7 +106,7 @@
 | `pipelineId` | string | 是 | 云效流水线 ID |
 | `params` | object | 是 | 传给云效流水线 API 的参数 |
 | `when.changedPaths` | string[] | 否 | 仅在指定路径前缀有改动时执行；`when` 不接受其他字段 |
-| `candidates` | object[] | 否 | 等价流水线候选；Planner 按当前计划负载选择一个 |
+| `candidates` | object[] | 否 | 等价流水线候选；Backend Client 执行前查询运行占用，优先选择空闲候选并按本次计划负载均衡；均忙时等待空闲或超时 |
 
 同一个项目、同一个环境、同一实际流水线只能选择 `pipeline` 或 `webhook` 一种触发方式。需要查询结果、超时控制或多仓编排时使用 `pipeline`。
 

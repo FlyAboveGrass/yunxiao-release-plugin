@@ -9,12 +9,18 @@ SCRIPT_PROJECTS=()
 SCRIPT_CLIENT_PROJECTS=()
 SCRIPT_CLIENT_REPOS=()
 SCRIPT_MANUAL_CLIENT_PROJECTS=()
+SCRIPT_DEPENDENCIES=()
+SCRIPT_PREFLIGHT_BRANCHES=()
 SCRIPT_SERVER_ONLY=0
 SCRIPT_VERBOSE=0
+SCRIPT_RESUME=0
+SCRIPT_RETRY_FAILED=0
+SCRIPT_STATE_FILE=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_FAT_FLOW_SCRIPT="${SCRIPT_DIR}/run-fat-flow.sh"
 PLAN_DEPLOY_SCRIPT="${SCRIPT_DIR}/plan-changed-fat-flow.sh"
 CONFIG_HELPER="${SCRIPT_DIR}/../release-configuration-cli.mjs"
+PREFLIGHT_SCRIPT="${SCRIPT_DIR}/preflight-merge-branches.mjs"
 
 # 展示脚本用法，避免固定流程入口传参不完整时难以排查。
 usage() {
@@ -23,6 +29,8 @@ Usage:
   run-full-fat-flow-deploy.sh --branch <source-branch> --repo <repo-path> [--repo <repo-path> ...] [--verbose]
   run-full-fat-flow-deploy.sh --branch <source-branch> --project <project-name> [--project <project-name> ...] [--client-project <project-name> ...] [--verbose]
   run-full-fat-flow-deploy.sh --branch <source-branch> --project <project-name> [--project <project-name> ...] --server-only [--verbose]
+  本次依赖顺序可重复传 --depends-on <consumer:provider>；本次预合并检查可重复传 --preflight-merge-branch <project:branch>
+  续跑时追加 --resume --state-file <上次输出的路径> [--retry-failed]
 EOF
 }
 
@@ -89,6 +97,26 @@ parse_args() {
         SCRIPT_SERVER_ONLY=1
         shift
         ;;
+      --depends-on)
+        SCRIPT_DEPENDENCIES+=("$2")
+        shift 2
+        ;;
+      --preflight-merge-branch)
+        SCRIPT_PREFLIGHT_BRANCHES+=("$2")
+        shift 2
+        ;;
+      --state-file)
+        SCRIPT_STATE_FILE="$2"
+        shift 2
+        ;;
+      --resume)
+        SCRIPT_RESUME=1
+        shift
+        ;;
+      --retry-failed)
+        SCRIPT_RETRY_FAILED=1
+        shift
+        ;;
       --verbose)
         SCRIPT_VERBOSE=1
         shift
@@ -122,11 +150,23 @@ parse_args() {
     usage
     exit 1
   fi
+  if [[ ${#SCRIPT_REPOS[@]} -eq 0 && ${#SCRIPT_PREFLIGHT_BRANCHES[@]} -gt 0 ]]; then
+    fail "--preflight-merge-branch 需要 --repo 才能检查本地 Git 分支"
+  fi
 
   if [[ "$SCRIPT_SERVER_ONLY" == "1" && ${#SCRIPT_MANUAL_CLIENT_PROJECTS[@]} -gt 0 ]]; then
     log_error "--server-only 与 --client-project 不能同时使用"
     usage
     exit 1
+  fi
+  if [[ "$SCRIPT_RESUME" == "1" && -z "$SCRIPT_STATE_FILE" ]]; then
+    fail "--resume 必须同时提供 --state-file"
+  fi
+  if [[ "$SCRIPT_RETRY_FAILED" == "1" && "$SCRIPT_RESUME" != "1" ]]; then
+    fail "--retry-failed 只能与 --resume 一起使用"
+  fi
+  if [[ "$SCRIPT_RESUME" != "1" && -n "$SCRIPT_STATE_FILE" && ( -e "$SCRIPT_STATE_FILE" || -e "${SCRIPT_STATE_FILE}.plan.json" ) ]]; then
+    fail "执行状态文件已存在，请使用 --resume 或更换路径"
   fi
 }
 
@@ -141,6 +181,64 @@ ensure_scripts_exist() {
   fi
   if [[ ! -f "$CONFIG_HELPER" ]]; then
     fail "release-configuration-cli.mjs 不存在"
+  fi
+  if [[ ! -f "$PREFLIGHT_SCRIPT" ]]; then
+    fail "preflight-merge-branches.mjs 不存在"
+  fi
+}
+
+# 在任何远端推送前模拟环境目标分支与显式配置的二级合并分支。
+preflight_repos() {
+  local repo
+  local project
+  local spec
+  local -a branches
+  local index=0
+  SCRIPT_STEP="preflight_merge_branches"
+  for repo in "${SCRIPT_REPOS[@]}"; do
+    project="${SCRIPT_PROJECTS[$index]}"
+    branches=()
+    for spec in "${SCRIPT_PREFLIGHT_BRANCHES[@]-}"; do
+      if [[ "$spec" == "$project:"* ]]; then
+        branches+=("${spec#*:}")
+      fi
+    done
+    if [[ ${#branches[@]} -gt 0 ]]; then
+      node "$PREFLIGHT_SCRIPT" "$repo" "$SCRIPT_BRANCH" fat "${branches[@]}" || fail "分支预合并检查失败: $repo"
+    fi
+    index=$((index + 1))
+  done
+}
+
+release_input_args() {
+  local spec
+  for spec in "${SCRIPT_DEPENDENCIES[@]-}"; do
+    [[ -n "$spec" ]] || continue
+    printf '%s\n' --depends-on "$spec"
+  done
+  for spec in "${SCRIPT_PREFLIGHT_BRANCHES[@]-}"; do
+    [[ -n "$spec" ]] || continue
+    printf '%s\n' --preflight-merge-branch "$spec"
+  done
+}
+
+# 在任何远端推送前确认流水线映射完整、项目依赖无环。
+validate_release_plan() {
+  local projects_csv
+  local client_projects_csv
+  local repos_csv
+  local client_repos_csv
+  local release_args=()
+  SCRIPT_STEP="validate_release_plan"
+  projects_csv="$(join_csv "${SCRIPT_PROJECTS[@]}")"
+  client_projects_csv="$(join_csv "${SCRIPT_CLIENT_PROJECTS[@]-}")"
+  while IFS= read -r value; do release_args+=("$value"); done < <(release_input_args)
+  if [[ ${#SCRIPT_REPOS[@]} -gt 0 ]]; then
+    repos_csv="$(join_csv "${SCRIPT_REPOS[@]}")"
+    client_repos_csv="$(join_csv "${SCRIPT_CLIENT_REPOS[@]-}")"
+    "$PLAN_DEPLOY_SCRIPT" --repos "$repos_csv" --client-repos "$client_repos_csv" --branch "$SCRIPT_BRANCH" "${release_args[@]-}" --validate || fail "发布计划校验失败"
+  else
+    "$PLAN_DEPLOY_SCRIPT" --projects "$projects_csv" --client-projects "$client_projects_csv" --branch "$SCRIPT_BRANCH" "${release_args[@]-}" --validate || fail "发布计划校验失败"
   fi
 }
 
@@ -301,6 +399,7 @@ run_single_deploy() {
   local repos_csv
   local client_repos_csv
   local identity_args=()
+  local value
   SCRIPT_STEP="run_deploy"
   projects_csv="$(join_csv "${SCRIPT_PROJECTS[@]}")"
   # 仅修改 server 时，client 项目集合为空是合法输入；显式传空值让下游跳过 client 阶段。
@@ -312,6 +411,16 @@ run_single_deploy() {
   else
     identity_args=(--projects "$projects_csv" --client-projects "$client_projects_csv")
   fi
+  if [[ -n "$SCRIPT_STATE_FILE" ]]; then
+    identity_args+=(--state-file "$SCRIPT_STATE_FILE")
+  fi
+  if [[ "$SCRIPT_RESUME" == "1" ]]; then
+    identity_args+=(--resume)
+  fi
+  if [[ "$SCRIPT_RETRY_FAILED" == "1" ]]; then
+    identity_args+=(--retry-failed)
+  fi
+  while IFS= read -r value; do identity_args+=("$value"); done < <(release_input_args)
   log_info "开始执行统一 FAT 部署: projects=${projects_csv} clientProjects=${client_projects_csv:-none}"
   log_progress "stage=deploy status=started projects=${projects_csv} clientProjects=${client_projects_csv:-none} order=frontend-client-deploy-then-backend-client-package-then-backend-server-deploy"
   if [[ "$SCRIPT_VERBOSE" == "1" ]]; then
@@ -345,8 +454,14 @@ main() {
   else
     normalize_projects
   fi
-  collect_client_projects
-  run_git_fat_flow_for_each_repo
+  if [[ "$SCRIPT_RESUME" != "1" ]]; then
+    collect_client_projects
+    validate_release_plan
+    if [[ ${#SCRIPT_REPOS[@]} -gt 0 ]]; then
+      preflight_repos
+    fi
+    run_git_fat_flow_for_each_repo
+  fi
   run_single_deploy
   finish_successfully
 }

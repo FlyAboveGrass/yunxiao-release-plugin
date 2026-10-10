@@ -398,4 +398,30 @@ const common = {
   }
 }
 
+{
+  const fixture = createFixture({
+    defaults: { organizationId: 'org-1' },
+    repository: {
+      ...common,
+      environments: { fat: {
+        branch: 'fat/fat', dependsOn: ['monkey-wx'],
+        steps: [{ type: 'promote-branch' }],
+      } },
+    },
+  });
+  try {
+    assert.throws(() => resolveReleaseConfiguration(fixture.repositoryRoot, fixture.env), /不是固定配置/);
+    writeJson(resolve(fixture.root, 'config/yunxiao-release/global-repositories.json'), {
+      schemaVersion: 1,
+      repositories: { 'example.com/team/backend-app': {
+        ...common,
+        environments: { fat: { branch: 'fat/fat', preflightMergeBranches: ['fat/fat_jdk17'], steps: [] } },
+      } },
+    });
+    assert.throws(() => resolveReleaseConfiguration(fixture.repositoryRoot, fixture.env), /不是固定配置/);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
 console.log('release configuration self-test passed');
